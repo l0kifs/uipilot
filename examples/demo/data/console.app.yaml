@@ -1,0 +1,227 @@
+app:
+  id: console
+  package: "@demo/console"
+  base_url:
+    env: CONSOLE_UI_URL
+    default: "http://127.0.0.1:4001"
+  id_prefix: cs
+  auth:
+    entry_flow: console_sign_in
+    storage_state_key: console
+
+elements:
+  # --- sign in ---
+  cs_input_email:
+    type: input
+    section: "Sign in"
+    selector: { strategy: role, role: textbox, name: "Email" }
+    purpose: "Operator email"
+  cs_input_password:
+    type: input
+    section: "Sign in"
+    selector: { strategy: label, label: "Password" }
+    purpose: "Operator password"
+  cs_btn_sign_in:
+    type: button
+    section: "Sign in"
+    selector: { strategy: role, role: button, name: "Sign in" }
+    purpose: "Submit credentials"
+  cs_input_mfa:
+    type: input
+    section: "Sign in"
+    selector: { strategy: role, role: textbox, name: "Authentication code" }
+    purpose: "TOTP challenge input"
+  cs_btn_verify:
+    type: button
+    section: "Sign in"
+    selector: { strategy: role, role: button, name: "Verify" }
+    purpose: "Submit MFA code"
+  cs_text_session:
+    type: text
+    section: "Dashboard"
+    selector: { strategy: text, text: "Current session" }
+    purpose: "Signed-in marker (auth guard)"
+
+  # --- projects ---
+  cs_link_projects:
+    type: link
+    section: "Nav"
+    selector: { strategy: role, role: link, name: "Projects" }
+    purpose: "Open the projects list"
+  cs_btn_project_create:
+    type: button
+    section: "Projects list"
+    selector: { strategy: role, role: button, name: "Create Project" }
+    purpose: "Open the Create Project dialog"
+  cs_dialog_create_project:
+    type: dialog
+    section: "Projects list"
+    selector: { strategy: role, role: dialog, name: "Create Project" }
+    purpose: "Create Project modal"
+  cs_input_project_name:
+    type: input
+    section: "Projects list"
+    selector: { strategy: role, role: textbox, name: "Project name" }
+    purpose: "New project display name (required)"
+  cs_btn_create_project_submit:
+    type: button
+    section: "Projects list"
+    selector: { strategy: role, role: button, name: "Create", scope: dialog }
+    purpose: "Submit the new project"
+  cs_toast_project_created:
+    type: toast
+    section: "Projects list"
+    selector: { strategy: text, text: "Project created" }
+    purpose: "Success confirmation"
+  cs_link_open_project:
+    type: link
+    section: "Projects list"
+    selector: { strategy: role, role: link, name: "Open details" }
+    purpose: "Open the newly created project"
+
+  # --- credentials ---
+  cs_tab_credentials:
+    type: tab
+    section: "Project detail"
+    selector: { strategy: role, role: tab, name: "Credentials" }
+    purpose: "Switch to the credentials tab"
+  cs_btn_credential_create:
+    type: button
+    section: "Project credentials"
+    selector: { strategy: role, role: button, name: "Create Credential" }
+    purpose: "Open the Create Credential dialog"
+  cs_dialog_create_credential:
+    type: dialog
+    section: "Project credentials"
+    selector: { strategy: role, role: dialog, name: "Create Credential" }
+    purpose: "Create Credential modal"
+  cs_input_credential_name:
+    type: input
+    section: "Project credentials"
+    selector: { strategy: role, role: textbox, name: "Credential name" }
+    purpose: "Credential label (required)"
+  cs_btn_create_credential_submit:
+    type: button
+    section: "Project credentials"
+    selector: { strategy: role, role: button, name: "Generate", scope: dialog }
+    purpose: "Generate the credential"
+  cs_toast_credential_created:
+    type: toast
+    section: "Project credentials"
+    selector: { strategy: text, text: "Credential created" }
+    purpose: "Success confirmation"
+
+actions:
+  act_cs_sign_in_submit:
+    purpose: "Enter operator email + password and submit."
+    route: "/sign-in"
+    risk: low
+    elements: [cs_input_email, cs_input_password, cs_btn_sign_in]
+    prev: []
+    next: [act_cs_sign_in_mfa]
+    params:
+      - { key: email,    type: string, required: true, default: "ops@{{prefix}}.test" }
+      - { key: password, type: secret, required: true }
+    steps:
+      - { op: fill,  element: cs_input_email,    value: "{{email}}" }
+      - { op: fill,  element: cs_input_password, value: "{{password}}" }
+      - { op: click, element: cs_btn_sign_in }
+      - { op: wait_for, element: cs_input_mfa }
+
+  act_cs_sign_in_mfa:
+    purpose: "Answer the TOTP challenge (totp capability)."
+    route: "/sign-in"
+    risk: credential
+    elements: [cs_input_mfa, cs_btn_verify]
+    prev: [act_cs_sign_in_submit]
+    next: [act_cs_view_dashboard]
+    params:
+      - { key: mfa_code, type: secret, required: true }
+    steps:
+      - { op: fill,  element: cs_input_mfa, value: "{{mfa_code}}" }
+      - { op: click, element: cs_btn_verify }
+      - { op: wait_for, element: cs_text_session }
+
+  act_cs_view_dashboard:
+    purpose: "Signed-in console dashboard (fan-in target)."
+    route: "/"
+    risk: low
+    elements: [cs_text_session, cs_link_projects]
+    prev: [act_cs_sign_in_mfa]
+    next: [act_cs_open_projects]
+    steps:
+      - { op: wait_for, element: cs_text_session }
+
+  act_cs_open_projects:
+    purpose: "Open the projects list."
+    route: "/projects"
+    risk: low
+    elements: [cs_link_projects, cs_btn_project_create]
+    prev: [act_cs_view_dashboard]
+    next: [act_cs_create_project]
+    steps:
+      - { op: click, element: cs_link_projects }
+      - { op: wait_for, element: cs_btn_project_create }
+
+  act_cs_create_project:
+    purpose: "Create a new project with a display name."
+    route: "/projects"
+    risk: low
+    elements: [cs_btn_project_create, cs_dialog_create_project, cs_input_project_name,
+               cs_btn_create_project_submit, cs_toast_project_created, cs_link_open_project]
+    prev: [act_cs_open_projects]
+    next: [act_cs_open_project_detail]
+    provides: [project]
+    params:
+      - { key: project_name, type: string, required: true, default: "{{prefix}}-project-{{seq}}" }
+    steps:
+      - { op: click,    element: cs_btn_project_create }
+      - { op: wait_for, element: cs_dialog_create_project }
+      - { op: fill,     element: cs_input_project_name, value: "{{project_name}}" }
+      - { op: click,    element: cs_btn_create_project_submit }
+      - { op: wait_for, element: cs_toast_project_created }
+    captures:
+      - { key: project_id, from: url, pattern: "/projects/(?<id>[0-9a-f-]{36})" }
+
+  act_cs_open_project_detail:
+    purpose: "Open the newly created project's detail page."
+    route: "/projects"
+    risk: low
+    elements: [cs_link_open_project, cs_tab_credentials]
+    prev: [act_cs_create_project]
+    next: [act_cs_credentials]
+    requires: [project]
+    steps:
+      - { op: click, element: cs_link_open_project }
+      - { op: wait_for, element: cs_tab_credentials }
+
+  act_cs_credentials:
+    purpose: "Switch to the project credentials tab."
+    route: "/projects"
+    risk: low
+    elements: [cs_tab_credentials, cs_btn_credential_create]
+    prev: [act_cs_open_project_detail]
+    next: [act_cs_create_credential]
+    steps:
+      - { op: click, element: cs_tab_credentials }
+      - { op: wait_for, element: cs_btn_credential_create }
+
+  act_cs_create_credential:
+    purpose: "Mint an API credential for the project."
+    route: "/projects"
+    risk: credential
+    elements: [cs_btn_credential_create, cs_dialog_create_credential, cs_input_credential_name,
+               cs_btn_create_credential_submit, cs_toast_credential_created]
+    prev: [act_cs_credentials]
+    next: []
+    provides: [credential]
+    params:
+      - { key: cred_name, type: string, required: true, default: "{{prefix}}-cred-{{seq}}" }
+    steps:
+      - { op: click,    element: cs_btn_credential_create }
+      - { op: wait_for, element: cs_dialog_create_credential }
+      - { op: fill,     element: cs_input_credential_name, value: "{{cred_name}}" }
+      - { op: click,    element: cs_btn_create_credential_submit }
+      - { op: wait_for, element: cs_toast_credential_created }
+    captures:
+      - { key: credential_id, from: url, pattern: "cred_(?<id>[0-9a-f]+)" }

@@ -1,0 +1,70 @@
+[project]
+name = "uipilot"
+version = "0.1.0"
+description = "App-agnostic engine that models a web UI as a graph and compiles flows into Playwright-MCP-executable scripts for agents."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Sergei Konovalov" }]
+keywords = ["playwright", "mcp", "ui-testing", "automation", "agents", "web-ui"]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+uipilot = "uipilot.presentation.cli:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "ty>=0.0.1a1",
+    "vulture>=2.11",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "uipilot"
+module-root = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --cov=uipilot --cov-report=term-missing --cov-fail-under=90"
+
+# --- Static analysis -------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# pyflakes (F), pycodestyle (E/W), isort (I), bugbear (B), pyupgrade (UP),
+# comprehensions (C4).
+select = ["E", "W", "F", "I", "B", "UP", "C4"]
+ignore = [
+    "E501",   # line length — long strings/tables are readable as-is
+    "UP045",  # Optional[X] over X | None — deliberate style with __future__ annotations
+    "UP007",  # Optional[X] / Union — same deliberate style
+    "B008",   # function-call-in-default — this IS the Typer Option() idiom
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "B905"]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.vulture]
+paths = ["src", "vulture_whitelist.py"]
+min_confidence = 60
+sort_by_size = true

@@ -1,0 +1,98 @@
+# Named flows + first-class API actions (transport: api).
+# API actions bind to existing test-framework factories/clients — they carry no
+# prev/next and are excluded from `path` (they are not navigation nodes).
+
+actions:
+  api_create_project:
+    transport: api
+    role: setup
+    app: console
+    purpose: "Provision a project via REST so a UI flow can start past onboarding."
+    risk: low
+    call: "factories.project:create_project"
+    provides: [project]
+    params:   [ { key: project_name, type: string, required: true, default: "{{prefix}}-project-{{seq}}" } ]
+    captures: [ { key: project_id, from: response, path: "$.id" } ]
+
+  api_create_credential:
+    transport: api
+    role: setup
+    app: console
+    purpose: "Mint an API credential via REST."
+    risk: credential
+    call: "factories.credential:create_credential"
+    provides: [credential]
+    params:   [ { key: cred_name, type: string, required: true, default: "{{prefix}}-cred-{{seq}}" } ]
+    captures: [ { key: credential_id, from: response, path: "$.id" } ]
+
+  api_create_wallet:
+    transport: api
+    role: setup
+    app: portal
+    purpose: "Provision a wallet via REST so a withdrawal flow can start."
+    risk: low
+    call: "factories.wallet:create_wallet"
+    provides: [wallet]
+    captures: [ { key: wallet_id, from: response, path: "$.id" } ]
+
+  api_assert_operation:
+    transport: api
+    role: crosscheck
+    app: portal
+    purpose: "After the UI submits a withdrawal, assert the backend recorded it."
+    risk: low
+    call: "clients.operation:get"
+    params: [ { key: operation_id, type: string, required: true } ]
+
+flows:
+  # --- L2 subflows (authored once, embedded anywhere) ---
+  console_sign_in:
+    app: console
+    description: "Operator sign-in + MFA."
+    guard: { expect: { text: "Current session" } }   # skip if already signed in
+    path: [act_cs_sign_in_submit, act_cs_sign_in_mfa]
+
+  portal_sign_in:
+    app: portal
+    description: "Portal credential sign-in."
+    path: [act_pt_sign_in]
+
+  api_onboard:
+    app: console
+    description: "Provision project + credential + wallet via REST (fast/stable path)."
+    path: [api_create_project, api_create_credential, api_create_wallet]
+
+  # --- product flows ---
+  create_project_with_credential:
+    app: console
+    description: "Sign in → create project → mint an API credential."
+    path:
+      - use: console_sign_in
+      - act_cs_open_projects
+      - act_cs_create_project
+      - act_cs_open_project_detail
+      - act_cs_credentials
+      - act_cs_create_credential
+    params:
+      - { key: project_name, type: string, default: "{{prefix}}-project-{{seq}}" }
+      - { key: cred_name,    type: string, default: "{{prefix}}-cred-{{seq}}" }
+
+  onboard_two_projects:
+    app: console
+    description: "Create two projects in one session (L3 aliased repeats)."
+    path:
+      - use: console_sign_in
+      - act_cs_open_projects
+      - { action: act_cs_create_project, as: primary,   params: { project_name: "{{prefix}}-primary" } }
+      - { action: act_cs_create_project, as: secondary, params: { project_name: "{{prefix}}-secondary" } }
+
+  portal_withdrawal_via_ui:
+    app: portal
+    description: "Provision via API, then drive only the withdrawal UI; cross-check backend."
+    path:
+      - { use: api_onboard, as: acct }                 # API precondition (agent runs it first)
+      - { action: act_pt_sign_in, params: { credential_id: "{{acct.credential_id}}" } }
+      - act_pt_open_wallet_detail                       # ← the UI slice under test
+      - act_pt_submit_withdrawal
+      - { action: api_assert_operation, role: crosscheck,
+          params: { operation_id: "{{captured.operation_id}}" } }

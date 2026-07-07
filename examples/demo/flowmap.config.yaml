@@ -1,0 +1,16 @@
+# Demo pack — proves the engine ports to any web app with zero engine changes.
+# Two apps ("console" ~ an admin surface, "portal" ~ an end-user surface).
+pack: demo
+apps: [console, portal]
+
+tokens:
+  prefix: { from: env, name: TEST_ENTITY_PREFIX, default: "demo" }
+  seq:    { from: counter }
+
+risk:
+  levels: [low, admin-control, credential, destructive, money-moving]
+  gated:  [destructive, money-moving]
+
+capabilities:
+  totp:          { impl: "capabilities:totp_from_secret" }
+  storage_state: { impl: "capabilities:playwright_storage_state" }

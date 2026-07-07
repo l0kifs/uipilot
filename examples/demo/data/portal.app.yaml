@@ -1,0 +1,147 @@
+app:
+  id: portal
+  package: "@demo/portal"
+  base_url:
+    env: PORTAL_UI_URL
+    default: "http://127.0.0.1:4002"
+  id_prefix: pt
+  auth:
+    entry_flow: portal_sign_in
+    storage_state_key: portal
+
+elements:
+  # --- sign in (credential-based) ---
+  pt_input_credential_id:
+    type: input
+    section: "Sign in"
+    selector: { strategy: role, role: textbox, name: "Credential ID" }
+    purpose: "Tenant credential id"
+  pt_input_credential_secret:
+    type: input
+    section: "Sign in"
+    selector: { strategy: label, label: "Credential secret" }
+    purpose: "Tenant credential secret (never logged)"
+  pt_btn_sign_in:
+    type: button
+    section: "Sign in"
+    selector: { strategy: role, role: button, name: "Continue" }
+    purpose: "Submit credential"
+  pt_text_welcome:
+    type: text
+    section: "Dashboard"
+    selector: { strategy: text, text: "Your wallets" }
+    purpose: "Signed-in marker"
+
+  # --- wallets ---
+  pt_link_wallets:
+    type: link
+    section: "Nav"
+    selector: { strategy: role, role: link, name: "Wallets" }
+    purpose: "Open the wallets list"
+  pt_link_open_wallet:
+    type: link
+    section: "Wallets list"
+    selector: { strategy: role, role: link, name: "Open wallet" }
+    purpose: "Open a wallet's detail page"
+  pt_btn_withdraw:
+    type: button
+    section: "Wallet detail"
+    selector: { strategy: role, role: button, name: "Withdraw" }
+    purpose: "Open the Withdraw dialog"
+  pt_dialog_withdraw:
+    type: dialog
+    section: "Wallet detail"
+    selector: { strategy: role, role: dialog, name: "Withdraw" }
+    purpose: "Withdraw modal"
+  pt_input_amount:
+    type: input
+    section: "Wallet detail"
+    selector: { strategy: role, role: textbox, name: "Amount" }
+    purpose: "Withdrawal amount"
+  pt_input_address:
+    type: input
+    section: "Wallet detail"
+    selector: { strategy: role, role: textbox, name: "Destination address" }
+    purpose: "Payout destination address"
+  pt_btn_withdraw_submit:
+    type: button
+    section: "Wallet detail"
+    selector: { strategy: role, role: button, name: "Submit", scope: dialog }
+    purpose: "Submit the withdrawal"
+  pt_toast_withdrawal:
+    type: toast
+    section: "Wallet detail"
+    selector: { strategy: text, text: "Withdrawal submitted" }
+    purpose: "Success confirmation"
+
+actions:
+  act_pt_sign_in:
+    purpose: "Sign in to the portal with a tenant credential."
+    route: "/signin"
+    risk: low
+    elements: [pt_input_credential_id, pt_input_credential_secret, pt_btn_sign_in, pt_text_welcome]
+    prev: []
+    next: [act_pt_view_dashboard]
+    params:
+      - { key: credential_id,     type: string, required: true }
+      - { key: credential_secret, type: secret, required: true }
+    steps:
+      - { op: fill,  element: pt_input_credential_id,     value: "{{credential_id}}" }
+      - { op: fill,  element: pt_input_credential_secret, value: "{{credential_secret}}" }
+      - { op: click, element: pt_btn_sign_in }
+      - { op: wait_for, element: pt_text_welcome }
+
+  act_pt_view_dashboard:
+    purpose: "Portal dashboard."
+    route: "/"
+    risk: low
+    elements: [pt_text_welcome, pt_link_wallets]
+    prev: [act_pt_sign_in]
+    next: [act_pt_open_wallets]
+    steps:
+      - { op: wait_for, element: pt_text_welcome }
+
+  act_pt_open_wallets:
+    purpose: "Open the wallets list."
+    route: "/wallets"
+    risk: low
+    elements: [pt_link_wallets, pt_link_open_wallet]
+    prev: [act_pt_view_dashboard]
+    next: [act_pt_open_wallet_detail]
+    steps:
+      - { op: click, element: pt_link_wallets }
+      - { op: wait_for, element: pt_link_open_wallet }
+
+  act_pt_open_wallet_detail:
+    purpose: "Open a wallet's detail page."
+    route: "/wallets"
+    risk: low
+    elements: [pt_link_open_wallet, pt_btn_withdraw]
+    prev: [act_pt_open_wallets]
+    next: [act_pt_submit_withdrawal]
+    requires: [wallet]
+    steps:
+      - { op: click, element: pt_link_open_wallet }
+      - { op: wait_for, element: pt_btn_withdraw }
+
+  act_pt_submit_withdrawal:
+    purpose: "Submit a withdrawal from the wallet (money-moving)."
+    route: "/wallets"
+    risk: money-moving
+    elements: [pt_btn_withdraw, pt_dialog_withdraw, pt_input_amount, pt_input_address,
+               pt_btn_withdraw_submit, pt_toast_withdrawal]
+    prev: [act_pt_open_wallet_detail]
+    next: []
+    requires: [wallet]
+    params:
+      - { key: amount,  type: amount,  required: true }
+      - { key: address, type: address, required: true }
+    steps:
+      - { op: click,    element: pt_btn_withdraw }
+      - { op: wait_for, element: pt_dialog_withdraw }
+      - { op: fill,     element: pt_input_amount,  value: "{{amount}}" }
+      - { op: fill,     element: pt_input_address, value: "{{address}}" }
+      - { op: click,    element: pt_btn_withdraw_submit }
+      - { op: wait_for, element: pt_toast_withdrawal }
+    captures:
+      - { key: operation_id, from: url, pattern: "op_(?<id>[0-9a-f]+)" }
