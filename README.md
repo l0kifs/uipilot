@@ -86,8 +86,12 @@ your_pack/
   API transports unchanged.
 
 See [`examples/demo/`](examples/demo/) for a complete two-app pack exercising
-every feature, and [`docs/PACK_AUTHORING.md`](docs/PACK_AUTHORING.md) for the
-field reference and porting checklist.
+every feature.
+
+**Docs:** [`docs/AGENT_GUIDE.md`](docs/AGENT_GUIDE.md) — driving flows as an agent
+(the core loop, execution contract, safety) · [`docs/USE_CASES.md`](docs/USE_CASES.md)
+— business use cases at a glance · [`docs/PACK_AUTHORING.md`](docs/PACK_AUTHORING.md)
+— pack field reference and porting checklist.
 
 ---
 
