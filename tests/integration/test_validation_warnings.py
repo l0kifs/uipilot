@@ -15,7 +15,8 @@ import yaml
 from uipilot.domain.validation import ERROR, validate
 from uipilot.infrastructure.pack_loader import load_pack
 
-DEMO = Path(__file__).resolve().parent.parent / "examples" / "demo"
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "examples" / "demo"
 
 
 def _broken(tmp_path, mutate):
@@ -60,6 +61,30 @@ def test_bad_api_role_error(tmp_path):
         ),
     )
     assert "E_BAD_API_ROLE" in _codes(pack)
+
+
+def test_route_undeclared_param_error(tmp_path):
+    # A route that templates a param the action never declares is E_PARAM_UNDECLARED.
+    def mutate(root):
+        _edit_console(
+            root,
+            lambda d: d["actions"]["act_cs_view_dashboard"].__setitem__("route", "/dash/{{who}}"),
+        )
+
+    assert "E_PARAM_UNDECLARED" in _codes(_broken(tmp_path, mutate))
+
+
+def test_route_declared_param_ok(tmp_path):
+    # Declaring the param the route templates clears the error.
+    def mutate(root):
+        def fn(d):
+            act = d["actions"]["act_cs_view_dashboard"]
+            act["route"] = "/dash/{{who}}"
+            act["params"] = [{"key": "who", "type": "string", "required": True}]
+
+        _edit_console(root, fn)
+
+    assert "E_PARAM_UNDECLARED" not in _codes(_broken(tmp_path, mutate))
 
 
 def test_no_steps_warning(tmp_path):

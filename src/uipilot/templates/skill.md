@@ -50,6 +50,27 @@ uipilot [--pack DIR] [--format json|table|md] <command> [opts]
 
 ## The core loop (running a flow)
 
+**Two standing rules whenever a user asks you to run/pass a flow:**
+
+- **Drive via a compiled script — don't hand-drive the UI element-by-element.**
+  Always compile the flow (`uipilot script --flow …`) and execute *its* steps.
+  Never free-form your way through with ad-hoc `browser_snapshot` →
+  reason-about-this-element → click; that per-element guessing is exactly what the
+  pack exists to replace. If no flow/pack covers the request yet, author the pack
+  first (see **Authoring & maintaining a pack**), then compile — don't fall back to
+  hand-driving.
+- **Default to a visible browser you can watch; only go headless if asked.** A
+  flow can run in a *visible* (headed) browser — the **default**, good for demos
+  and risky/first runs — or *headless* in the background (faster, for known-good
+  automation). Run headed unless the user explicitly asks to run it in the
+  background. This is set by how the **Playwright MCP server** was launched — a
+  server-launch setting, not a per-call tool arg:
+  - **Watch (default)** → the MCP server must be running **headed** (visible
+    window), ideally with a `slowMo` launch option so steps are followable. If it's
+    currently headless, tell the human to relaunch the MCP server headed (+ slowMo)
+    before you start — you can't toggle it mid-session.
+  - **Background** → a **headless** MCP server. Use only when the user asks for it.
+
 1. **Pick the app**: `uipilot apps`. **If it returns >1 app**, don't guess "the app" — match the user's wording to an app `id`/`base_url`, else ask which. Login/auth flows are each app's `auth_entry_flow`.
 2. **Find the flow**: `uipilot flows` → pick an id. `uipilot flow NAME` inspects path/params **and any `guard`** — a cheap `expect`/`wait_for` meaning "already done, skip if it passes" (e.g. auth flows guard on a signed-in marker). Guards appear here, **not** in `script` output, so for sign-in: check the guard / reuse an existing session before running the flow.
 3. **(Optional) drift-check first**: `uipilot verify --flow NAME` → read-only probe; if an element/route fails to resolve, the map is stale — stop and report.
@@ -159,7 +180,7 @@ elements:
 actions:
   act_cs_create:
     purpose: "Create a project."
-    route: "/projects"           # appended to base_url for the navigate step
+    route: "/projects"           # base_url+route → navigate step; may template {{params}}
     risk: low                    # must be one of config.risk.levels
     elements: [cs_btn_create, cs_input_name, cs_toast_created]
     prev: [act_cs_open_projects] # graph edges (drive `path`/`next`/`prev`)
@@ -185,34 +206,55 @@ actions:
 | `Step` | `op`, `element?`, `value?`, `wait_for?` (`{text}`\|`{textGone}`\|`{time}`), `scope?`, `optional?` |
 | `Capture` | `key`, `from` (`url`\|`element`\|`clipboard`\|`response`), `pattern?` (regex w/ named group), `path?` (JSONPath for `response`), `element?` |
 
-### Selectors — convert Playwright locator expressions to structured form
+**Templated routes — reach detail pages by URL.** A `route` may contain `{{param}}`/`{{token}}`
+refs, e.g. `route: "/clients/{{client_id}}/wallets/{{wallet_id}}"` with matching `params`. At
+`script` time a supplied value (`--set client_id=…`) substitutes into the navigate URL; an
+unsupplied required param is listed in `params_required` and left as a `{{placeholder}}` for the
+agent. Navigations dedup on the **resolved** URL (same concrete URL collapses; distinct ids don't).
+Prefer a templated route over clicking through table rows when a page is URL-addressable — it's
+deterministic and needs no per-row selector. `validate` flags a route templating an undeclared param.
 
-Selectors are stored **structurally**, never as a raw `getByRole(...)` string, so
-they stay lintable and re-emittable. Strategies: `role` · `label` · `text` ·
-`testid` · `css` (author priority in that order). Keys: `strategy`, `role`,
-`name`, `text`, `label`, `css`, `testid`, `scope`, `exact`. `name` applies only
-to `role`/`label`/`text`.
+### Selectors — prefer structural CSS (or XPath); never anchor on text
 
-A UI map (or a live snapshot) usually gives you Playwright locator expressions —
-convert each one:
+Selectors are stored **structurally**, never as a raw locator string, so they
+stay lintable and re-emittable. Keys: `strategy`, `role`, `name`, `text`,
+`label`, `css`, `testid`, `scope`, `exact`. Supported strategies: `css` ·
+`testid` · `label` · `role` · `text`. `name` applies only to `role`/`label`/`text`.
 
-| Locator expression | Structured selector |
+**Default authoring policy — chosen for robustness against minor UI changes:**
+
+- **Default to `css`.** Anchor on stable structure — an `id`, a `data-*` /
+  `data-testid` attribute, or a stable class/DOM path:
+  `{ strategy: css, css: "[data-testid='submit']" }`. Reach for this first.
+- **Use XPath only when CSS can't express it** (axis/position, structural
+  relationships CSS lacks). There is **no dedicated `xpath` strategy** — ride the
+  `css` strategy with an `xpath=`/`//…` string; Playwright's `locator()`
+  auto-detects it: `{ strategy: css, css: "xpath=//tr[2]//button" }`.
+- **Never anchor on element text.** Do **not** use `strategy: text` — and avoid
+  the content-derived `role`+`name`/`label` forms, which share the same fragility
+  — **unless the user explicitly instructs you to.** Visible copy shifts with
+  translations, wording tweaks, and A/B tests, so text-based selectors break
+  first.
+
+A UI map or a live snapshot often hands you Playwright locator expressions or
+role/text descriptions — **translate them to a `css` anchor** rather than storing
+them as-is. Find the structural attribute behind the element:
+
+| You're handed | Author as (preferred) |
 |---|---|
-| `getByRole('button', { name: 'Save' })` | `{ strategy: role, role: button, name: "Save" }` |
-| `getByRole('textbox', { name: 'Email' })` | `{ strategy: role, role: textbox, name: "Email" }` |
-| `getByLabel('Password')` | `{ strategy: label, label: "Password" }` |
-| `getByText('No tenants yet')` | `{ strategy: text, text: "No tenants yet" }` |
-| `getByTestId('submit')` | `{ strategy: testid, testid: "submit" }` |
-| CSS / `data-*` | `{ strategy: css, css: ".panel [data-role=x]" }` |
-| dialog's *Create* vs the page's *Create* | add `scope: dialog` → emits `getByRole('dialog').getByRole('button', { name: 'Create' })` |
+| a `data-testid` / `data-*` attribute | `{ strategy: css, css: "[data-testid='submit']" }` |
+| a stable `id` | `{ strategy: css, css: "#submit" }` |
+| `getByTestId('submit')` | `{ strategy: css, css: "[data-testid='submit']" }` (or `{ strategy: testid, testid: "submit" }`) |
+| structure CSS can't reach | `{ strategy: css, css: "xpath=//tr[2]//button" }` |
+| dialog's *Create* vs the page's *Create* | scope in css: `{ strategy: css, css: "[role=dialog] [data-testid='create']" }` |
 
-`name` is a **normalized, case-insensitive substring** match by default. So a
-map entry written as a regex — `name: /code/i`, `name: /Copy ID/` — becomes a
-plain literal: `{ strategy: role, role: textbox, name: "code" }`. Add
-`exact: true` only to force a full exact-name match. For an alternation regex
-like `/verify|submit/i`, pick the one literal the live app actually renders
-(snapshot it if unsure); for a name that varies per row/record, prefer a
-`testid` or a stable `text`/`css` anchor over a brittle `name`.
+**Only when the user explicitly opts into text/role selectors** do the
+content-based forms apply: `getByRole('button', { name: 'Save' })` →
+`{ strategy: role, role: button, name: "Save" }`; `getByLabel('Password')` →
+`{ strategy: label, label: "Password" }`; `getByText('…')` →
+`{ strategy: text, text: "…" }`. There, `name` is a **normalized,
+case-insensitive substring** match (`exact: true` forces a full match); pick the
+one literal the live app actually renders (snapshot if unsure).
 
 ### Step ops → Playwright-MCP tool
 

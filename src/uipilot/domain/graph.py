@@ -60,11 +60,11 @@ def find_path(
             continue
         for nxt in adj.get(path[-1], []):
             if nxt == dst:
-                full = path + [nxt]
+                full = [*path, nxt]
                 return PathResult(True, full, len(full))
             if nxt not in seen:
                 seen.add(nxt)
-                queue.append(path + [nxt])
+                queue.append([*path, nxt])
     return PathResult(False, [], 0, reason="no next-edge path within max-depth")
 
 

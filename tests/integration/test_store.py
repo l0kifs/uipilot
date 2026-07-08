@@ -32,7 +32,7 @@ def test_flow_path_entry_shapes(pack):
     flow = pack.flow("portal_withdrawal_via_ui")
     first = flow.path[0]
     assert first.use == "api_onboard" and first.alias == "acct"
-    withdrawal = [p for p in flow.path if p.action == "act_pt_sign_in"][0]
+    withdrawal = next(p for p in flow.path if p.action == "act_pt_sign_in")
     assert withdrawal.params["credential_id"] == "{{acct.credential_id}}"
 
 

@@ -19,7 +19,8 @@ from uipilot.presentation.cli import app
 
 runner = CliRunner()
 
-DEMO = Path(__file__).resolve().parent.parent / "examples" / "demo"
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "examples" / "demo"
 PACK = ["--pack", str(DEMO)]
 
 
@@ -44,13 +45,13 @@ def test_apps_json_lists_both_apps():
 
 
 def test_apps_table_format_renders():
-    result = runner.invoke(app, PACK + ["--format", "table", "apps"])
+    result = runner.invoke(app, [*PACK, "--format", "table", "apps"])
     assert result.exit_code == 0
     assert "console" in result.stdout
 
 
 def test_apps_markdown_format_wraps_json():
-    result = runner.invoke(app, PACK + ["--format", "md", "apps"])
+    result = runner.invoke(app, [*PACK, "--format", "md", "apps"])
     assert result.exit_code == 0
     assert "```json" in result.stdout
 
@@ -93,7 +94,7 @@ def test_actions_filter_by_grep_and_app_and_section():
 
 
 def test_actions_table_format():
-    result = runner.invoke(app, PACK + ["--format", "table", "actions"])
+    result = runner.invoke(app, [*PACK, "--format", "table", "actions"])
     assert result.exit_code == 0
 
 
@@ -120,7 +121,7 @@ def test_elements_unknown_action_exits_2():
 
 
 def test_elements_table_format():
-    result = runner.invoke(app, PACK + ["--format", "table", "elements"])
+    result = runner.invoke(app, [*PACK, "--format", "table", "elements"])
     assert result.exit_code == 0
 
 
@@ -170,7 +171,7 @@ def test_uses_element_action_flow_and_unknown():
 def test_flows_json_and_table():
     data = json.loads(run("flows").stdout)
     assert any(f["id"] == "create_project_with_credential" for f in data["flows"])
-    assert runner.invoke(app, PACK + ["--format", "table", "flows"]).exit_code == 0
+    assert runner.invoke(app, [*PACK, "--format", "table", "flows"]).exit_code == 0
 
 
 def test_flow_detail_and_missing():
@@ -353,7 +354,7 @@ def test_validate_scoped_to_app():
 
 
 def test_validate_table_format():
-    assert runner.invoke(app, PACK + ["--format", "table", "validate"]).exit_code == 0
+    assert runner.invoke(app, [*PACK, "--format", "table", "validate"]).exit_code == 0
 
 
 def test_validate_broken_pack_exits_1(tmp_path):

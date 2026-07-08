@@ -156,25 +156,30 @@ def _lint_actions(pack: Pack, out: list[Finding]) -> None:
                 Finding(WARNING, "W_NO_STEPS", action.id, "action has elements but no step recipe")
             )
 
-        # E_PARAM_UNDECLARED — step template refs must resolve to a param/token.
+        # E_PARAM_UNDECLARED — step/route template refs must resolve to a param/token.
         declared = {p.key for p in action.params}
         tokens = set(pack.config.tokens)
+        # Route may template params too (e.g. /projects/{{project_id}}).
+        labelled_refs = [("route", r) for r in iter_template_refs(action.route)]
         for step in action.steps:
-            refs = iter_template_refs(step.value)
+            labelled_refs += [("step", r) for r in iter_template_refs(step.value)]
             for wf_val in (step.wait_for or {}).values():
-                refs += iter_template_refs(wf_val if isinstance(wf_val, str) else None)
-            for ref in refs:
-                if "." in ref or ref == "base_url":
-                    continue  # runtime capture / injected base url
-                if ref not in declared and ref not in tokens:
-                    out.append(
-                        Finding(
-                            ERROR,
-                            "E_PARAM_UNDECLARED",
-                            action.id,
-                            f"step uses {{{{{ref}}}}} with no matching param",
-                        )
+                labelled_refs += [
+                    ("step", r)
+                    for r in iter_template_refs(wf_val if isinstance(wf_val, str) else None)
+                ]
+        for where, ref in labelled_refs:
+            if "." in ref or ref == "base_url":
+                continue  # runtime capture / injected base url
+            if ref not in declared and ref not in tokens:
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_PARAM_UNDECLARED",
+                        action.id,
+                        f"{where} uses {{{{{ref}}}}} with no matching param",
                     )
+                )
 
         # W_DUPLICATE_RECIPE
         if action.steps:
@@ -198,7 +203,7 @@ def _lint_selectors(pack: Pack, out: list[Finding]) -> None:
     # selector signature (a static proxy for live ambiguity).
     by_sig: dict[tuple, list[str]] = {}
     for el in pack.elements.values():
-        key = (el.app,) + el.selector.signature()
+        key = (el.app, *el.selector.signature())
         by_sig.setdefault(key, []).append(el.id)
     for ids in by_sig.values():
         if len(ids) > 1:

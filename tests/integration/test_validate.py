@@ -18,7 +18,11 @@ def _broken_pack(tmp_path: Path, mutate) -> None:
     """Copy the demo pack into tmp_path and apply a mutation callback."""
     import shutil
 
-    src = Path(__file__).resolve().parent.parent / "examples" / "demo"
+    src = (
+        next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+        / "examples"
+        / "demo"
+    )
     shutil.copytree(src, tmp_path, dirs_exist_ok=True)
     mutate(tmp_path)
 

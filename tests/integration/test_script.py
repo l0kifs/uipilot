@@ -1,10 +1,101 @@
 from __future__ import annotations
 
+import itertools
+import shutil
+from pathlib import Path
+
+import yaml
+
 from uipilot.domain.compiler import compile_actions, compile_flow, compile_path
+from uipilot.domain.templating import RuntimeContext
+from uipilot.infrastructure.pack_loader import load_pack
+
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "examples" / "demo"
 
 
 def _ops(script):
     return [s.op for s in script.steps]
+
+
+def _navs(script):
+    return [s.value for s in script.steps if s.op == "navigate"]
+
+
+def _pack_with_templated_route(tmp_path):
+    """Demo pack + an action whose route templates a param (/projects/{{project_id}})."""
+    shutil.copytree(DEMO, tmp_path, dirs_exist_ok=True)
+    ap = tmp_path / "data" / "console.app.yaml"
+    doc = yaml.safe_load(ap.read_text())
+    doc["elements"]["cs_text_project_hdr"] = {
+        "type": "text",
+        "section": "Project",
+        "selector": {"strategy": "role", "role": "heading", "name": "Project detail"},
+        "purpose": "Project detail header",
+    }
+    doc["actions"]["act_cs_open_project"] = {
+        "purpose": "Open a project by id.",
+        "route": "/projects/{{project_id}}",
+        "risk": "low",
+        "elements": ["cs_text_project_hdr"],
+        "params": [{"key": "project_id", "type": "string", "required": True}],
+        "steps": [{"op": "wait_for", "element": "cs_text_project_hdr"}],
+    }
+    ap.write_text(yaml.safe_dump(doc))
+
+    fp = tmp_path / "data" / "flows.yaml"
+    fdoc = yaml.safe_load(fp.read_text())
+    fdoc["flows"]["visit_two_projects"] = {
+        "app": "console",
+        "path": [
+            {"action": "act_cs_open_project", "as": "a", "params": {"project_id": "p1"}},
+            {"action": "act_cs_open_project", "as": "b", "params": {"project_id": "p2"}},
+        ],
+    }
+    fdoc["flows"]["visit_same_project_twice"] = {
+        "app": "console",
+        "path": [
+            {"action": "act_cs_open_project", "as": "a", "params": {"project_id": "same"}},
+            {"action": "act_cs_open_project", "as": "b", "params": {"project_id": "same"}},
+        ],
+    }
+    fp.write_text(yaml.safe_dump(fdoc))
+
+    pack = load_pack(tmp_path)
+    ctx = RuntimeContext(pack.config, env={"TEST_ENTITY_PREFIX": "demo"})
+    return pack, ctx
+
+
+def test_route_param_substituted(tmp_path):
+    pack, ctx = _pack_with_templated_route(tmp_path)
+    s = compile_actions(
+        pack, ctx, ["act_cs_open_project"], skip_auth=True, overrides={"project_id": "abc123"}
+    )
+    assert _navs(s) == ["http://127.0.0.1:4001/projects/abc123"]
+    assert "project_id" not in s.params_required
+
+
+def test_route_param_required_when_missing(tmp_path):
+    pack, ctx = _pack_with_templated_route(tmp_path)
+    s = compile_actions(pack, ctx, ["act_cs_open_project"], skip_auth=True)
+    # Reported required, and the placeholder is preserved for the agent to fill.
+    assert "project_id" in s.params_required
+    assert _navs(s) == ["http://127.0.0.1:4001/projects/{{project_id}}"]
+
+
+def test_route_distinct_ids_not_deduped(tmp_path):
+    pack, ctx = _pack_with_templated_route(tmp_path)
+    s = compile_flow(pack, ctx, "visit_two_projects", skip_auth=True)
+    assert _navs(s) == [
+        "http://127.0.0.1:4001/projects/p1",
+        "http://127.0.0.1:4001/projects/p2",
+    ]
+
+
+def test_route_same_resolved_url_deduped(tmp_path):
+    pack, ctx = _pack_with_templated_route(tmp_path)
+    s = compile_flow(pack, ctx, "visit_same_project_twice", skip_auth=True)
+    assert _navs(s) == ["http://127.0.0.1:4001/projects/same"]
 
 
 def test_snapshot_inserted_only_on_dom_change(pack, ctx):
@@ -13,7 +104,7 @@ def test_snapshot_inserted_only_on_dom_change(pack, ctx):
     # first interacting step is preceded by a snapshot
     assert ops[0] == "navigate" and ops[1] == "snapshot"
     # no two snapshots in a row (defensive snapshots avoided)
-    for a, b in zip(ops, ops[1:]):
+    for a, b in itertools.pairwise(ops):
         assert not (a == "snapshot" and b == "snapshot")
 
 

@@ -411,24 +411,30 @@ class _Compiler:
             base_url = self.ctx.base_url(app) if app else ""
             pmap = self._build_param_map(action, inv.params, flow_defaults)
 
-            # Synthesised navigation (deduped against the current route).
-            if action.route and action.route != current_route:
-                url = (
-                    (base_url.rstrip("/") + action.route)
-                    if base_url
-                    else "{{base_url}}" + action.route
+            # Synthesised navigation. Resolve {{param}}/{{token}} refs in the
+            # route (e.g. /projects/{{project_id}}) with this action's params,
+            # then dedup against the current *resolved* route so two visits to
+            # the same concrete URL collapse while distinct ids stay separate.
+            if action.route:
+                route, unresolved = resolve_template(
+                    action.route, {"base_url": base_url, **pmap}, self.ctx
                 )
-                steps.append(
-                    CompiledStep(
-                        n=0,
-                        op="navigate",
-                        action=action.id,
-                        value=url,
-                        mcp=self._mcp_for("navigate", url=url),
+                for ref in unresolved:
+                    if "." not in ref and ref not in self.params_required:
+                        self.params_required.append(ref)
+                if route is not None and route != current_route:
+                    url = (base_url.rstrip("/") + route) if base_url else "{{base_url}}" + route
+                    steps.append(
+                        CompiledStep(
+                            n=0,
+                            op="navigate",
+                            action=action.id,
+                            value=url,
+                            mcp=self._mcp_for("navigate", url=url),
+                        )
                     )
-                )
-                current_route = action.route
-                needs_snapshot = True
+                    current_route = route
+                    needs_snapshot = True
 
             for step in action.steps:
                 if step.op == "navigate":

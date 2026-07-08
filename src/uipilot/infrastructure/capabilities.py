@@ -12,6 +12,7 @@ against the pack's own source tree.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import sys
 from collections.abc import Callable
@@ -36,10 +37,8 @@ def _pack_on_path(pack_root: Optional[Path]):
         yield
     finally:
         if inserted:
-            try:
+            with contextlib.suppress(ValueError):  # entry already removed elsewhere
                 sys.path.remove(added)
-            except ValueError:  # pragma: no cover
-                pass
 
 
 def _import_impl(impl: str, pack_root: Optional[Path]) -> Callable:

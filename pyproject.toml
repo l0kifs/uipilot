@@ -1,6 +1,6 @@
 [project]
 name = "uipilot"
-version = "0.3.0"
+version = "0.4.0"
 description = "App-agnostic engine that models a web UI as a graph and compiles flows into Playwright-MCP-executable scripts for agents."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -20,6 +20,7 @@ uipilot = "uipilot.presentation.cli:app"
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.6",
     "ruff>=0.15.20",
     "ty>=0.0.57",
     "vulture>=2.16",
@@ -35,23 +36,44 @@ module-root = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --cov=uipilot --cov-report=term-missing --cov-fail-under=90"
+addopts = "-ra --strict-markers --cov=uipilot --cov-branch --cov-report=term-missing --cov-fail-under=90"
+markers = [
+    "unit: pure logic, no I/O",
+    "integration: touches real external resources (filesystem, pack loading)",
+    "e2e: exercises the whole app end-to-end through the CLI",
+]
 
 [tool.coverage.run]
+source = ["uipilot"]
+branch = true
+parallel = true  # each xdist worker / CLI subprocess writes its own .coverage.*
 # Templates are inert scaffolding shipped as package data, not code under test.
 omit = ["*/uipilot/templates/*"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@(abc\\.)?abstractmethod",
+]
 
 # --- Static analysis -------------------------------------------------------
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+# target-version omitted — Ruff infers it from requires-python so the two can't drift.
 src = ["src", "tests"]
 
 [tool.ruff.lint]
 # pyflakes (F), pycodestyle (E/W), isort (I), bugbear (B), pyupgrade (UP),
-# comprehensions (C4).
-select = ["E", "W", "F", "I", "B", "UP", "C4"]
+# comprehensions (C4), bandit-security (S), simplify (SIM), return (RET),
+# use-pathlib (PTH), Ruff-native (RUF).
+select = ["E", "W", "F", "I", "B", "UP", "C4", "S", "SIM", "RET", "PTH", "RUF"]
 ignore = [
     "E501",   # line length — long strings/tables are readable as-is
     "UP045",  # Optional[X] over X | None — deliberate style with __future__ annotations
@@ -60,7 +82,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["B011", "B905"]
+# Tests: `assert` is the point (S101); fixture credentials and /tmp paths are
+# inert test data, not real secrets (S105/S106/S108).
+"tests/**" = ["B011", "B905", "S101", "S105", "S106", "S108"]
 # vulture_whitelist.py is generated bare attribute refs simulating usage — B018
 # ("useless expression") is exactly its shape by design.
 "vulture_whitelist.py" = ["B018"]
@@ -71,7 +95,10 @@ python-version = "3.12"
 [tool.ty.src]
 include = ["src"]
 
+[tool.ty.rules]
+unresolved-import = "error"  # missing dep / wrong venv should fail loudly
+
 [tool.vulture]
 paths = ["src", "vulture_whitelist.py"]
-min_confidence = 60
+min_confidence = 80
 sort_by_size = true

@@ -89,14 +89,17 @@ uipilot --pack examples/demo verify --flow create_project_with_credential
     └── flows.yaml            # named multi-app flows (+ shared/API actions)
 ```
 
-* **Element** — a node with a structured selector (`role(name)` > `label` >
-  `text` > `css`) and a purpose. Never a raw locator string, so it re-emits to a
-  Playwright-MCP element description *or* a `@playwright/test` locator.
+* **Element** — a node with a structured selector (default `css`/`testid`; XPath
+  via a `css` `xpath=…` string; `role`/`label`/`text` available but text-based
+  anchors are opt-in) and a purpose. Never a raw locator string, so it re-emits to
+  a Playwright-MCP element description *or* a `@playwright/test` locator.
 * **Action** — the graph proper. A UI action carries a `route`, an ordered
-  `steps` recipe, `prev`/`next` edges, `params`, and `captures`. An **API
-  action** (`transport: api`) binds to an existing test-framework factory via
-  `call:` for fast provisioning or backend cross-checks — it has no `prev`/`next`
-  and is excluded from pathfinding.
+  `steps` recipe, `prev`/`next` edges, `params`, and `captures`. The `route` may
+  template `{{param}}`/`{{token}}` refs (e.g. `/clients/{{client_id}}`) so
+  URL-addressable detail pages are reached by navigation, not row-clicking. An
+  **API action** (`transport: api`) binds to an existing test-framework factory
+  via `call:` for fast provisioning or backend cross-checks — it has no
+  `prev`/`next` and is excluded from pathfinding.
 * **Flow** — an ordered `path` of action ids. Entries can be a bare id, a
   subflow (`use:`), or an aliased repeat (`{action, as, params}`). Reuse is
   layered L1–L4 (shared actions → subflows → aliased invocations → guards).

@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typer.testing import CliRunner
-
 from uipilot.domain.validation import validate
 from uipilot.infrastructure import scaffold
 from uipilot.infrastructure.pack_loader import load_pack
-from uipilot.presentation.cli import app
-
-runner = CliRunner()
 
 
 def test_init_scaffolds_a_valid_pack(tmp_path):
@@ -67,10 +62,3 @@ def test_unknown_agent_is_ignored(tmp_path):
     result = scaffold.init_project(tmp_path, agents=["bogus"])
     assert result["agents"] == []
     assert not (tmp_path / ".claude").exists()
-
-
-def test_init_cli_prints_friendly_summary(tmp_path):
-    res = runner.invoke(app, ["init", str(tmp_path), "--agent", "claude"])
-    assert res.exit_code == 0
-    assert "uipilot ready" in res.stdout
-    assert ".uipilot/flowmap.config.yaml" in res.stdout

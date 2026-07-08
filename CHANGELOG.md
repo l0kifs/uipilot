@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-08
+
+### Added
+
+- **Selector authoring policy in the agent guide.** `skill.md` now defaults to
+  structural **CSS** selectors (`id`/`data-*`/`data-testid`/DOM path), falling
+  back to **XPath** only when CSS can't express the target — expressed via the
+  `css` strategy with an `xpath=`/`//…` string, which Playwright's `locator()`
+  auto-detects (there is no separate `xpath` strategy). Text-based selectors
+  (`strategy: text`, and content-derived `role`/`label` anchors) are now used
+  **only when the user explicitly asks**, since visible copy is the first thing to
+  break on minor UI changes. README's element description updated to match.
+- **Run-a-flow policy in the agent guide.** `skill.md`'s core loop now opens with
+  two standing rules: always drive a flow via a compiled `uipilot script` (never
+  hand-drive the UI element-by-element), and default to running the flow in a
+  **visible/headed** Playwright MCP browser (ideally with `slowMo`) so it's
+  watchable — going **headless** only when the user asks for a background run.
+  Browser visibility is a server-launch setting, not a per-call arg.
+- **Route templating.** An action's `route` now resolves `{{param}}`/`{{token}}`
+  refs (e.g. `route: "/projects/{{project_id}}"`), so URL-addressable detail
+  pages can be reached by navigation instead of only by clicking through table
+  rows. Supplied params (`--set project_id=…`) substitute into the navigate URL;
+  unsupplied required params are reported in `params_required` and left as a
+  `{{placeholder}}`. Navigations dedup on the **resolved** URL. `verify` resolves
+  route tokens too, and `validate` now flags a route that templates an undeclared
+  param (`E_PARAM_UNDECLARED` — message reads `route uses {{x}}…`).
+
+### Changed
+
+- **Test suite reorganised into `unit`/`integration`/`e2e`** with matching
+  pytest markers, plus branch coverage, `pytest-xdist` for parallel runs, and a
+  stricter static-analysis config (added ruff `S`/`SIM`/`RET`/`PTH`/`RUF` rule
+  sets, `ty` `unresolved-import = error`, and vulture `min_confidence = 80`).
+
 ## [0.3.0] - 2026-07-08
 
 ### Changed
@@ -72,7 +106,8 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/l0kifs/uipilot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/l0kifs/uipilot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/l0kifs/uipilot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/l0kifs/uipilot/releases/tag/v0.1.0

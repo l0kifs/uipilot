@@ -18,7 +18,8 @@ from uipilot.domain.model import CapabilitySpec, Config
 from uipilot.infrastructure import pack_loader as pl
 from uipilot.infrastructure.capabilities import CapabilityRegistry
 
-DEMO = Path(__file__).resolve().parent.parent / "examples" / "demo"
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "examples" / "demo"
 
 
 # ---------------------------------------------------------------------------

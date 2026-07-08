@@ -8,21 +8,19 @@ data — the contract every front-end depends on.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from uipilot.application import service
 from uipilot.application.service import PackContext, open_pack
 
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "examples" / "demo"
+
 
 def test_open_pack_builds_runtime_context():
-    pctx = open_pack(
-        str(
-            pytest.importorskip("pathlib").Path(__file__).resolve().parent.parent
-            / "examples"
-            / "demo"
-        ),
-        env={"TEST_ENTITY_PREFIX": "demo"},
-    )
+    pctx = open_pack(str(DEMO), env={"TEST_ENTITY_PREFIX": "demo"})
     assert isinstance(pctx, PackContext)
     assert pctx.pack.config.pack == "demo"
     # env is threaded into token resolution
@@ -31,9 +29,8 @@ def test_open_pack_builds_runtime_context():
 
 def test_open_pack_defaults_to_os_environ(monkeypatch):
     monkeypatch.setenv("TEST_ENTITY_PREFIX", "envval")
-    from pathlib import Path
 
-    pctx = open_pack(Path(__file__).resolve().parent.parent / "examples" / "demo")
+    pctx = open_pack(DEMO)
     assert pctx.runtime.token("prefix") == "envval"
 
 

@@ -18,7 +18,7 @@ from typing import Optional
 from uipilot.domain.compiler import compile_flow
 from uipilot.domain.flows import expand_invocations
 from uipilot.domain.model import Action, Pack
-from uipilot.domain.templating import RuntimeContext
+from uipilot.domain.templating import RuntimeContext, resolve_template
 
 
 def _route_groups(pack: Pack, actions: list[Action]) -> list[tuple[Optional[str], list[str]]]:
@@ -41,6 +41,10 @@ def _probe_steps(
     n = 0
     current_route = object()  # sentinel != None
     for route, elems in groups:
+        # Resolve pack tokens in the route (params are unavailable to a probe, so
+        # entity ids like {{project_id}} stay as placeholders for the agent).
+        if route is not None:
+            route, _ = resolve_template(route, {"base_url": base_url}, ctx)
         if route is not None and route != current_route:
             url = (base_url.rstrip("/") + route) if base_url else "{{base_url}}" + route
             n += 1

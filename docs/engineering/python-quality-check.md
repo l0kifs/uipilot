@@ -137,6 +137,16 @@ min_confidence = 80
 
 ## 2. Tests with pytest
 
+### Conventions
+
+Non-negotiable for every tier; a test that breaks one is a defect to fix.
+
+- **AAA structure** — blank-line-separated *arrange* (inputs/state), *act* (the one behavior under test), *assert*. One act per test; a second act means a second test. Share arrange via fixtures.
+- **Independence** — no test relies on another's state or order. Set up and tear down via fixtures (`tmp_path`, `yield`); no shared mutable module state. Must give identical results shuffled and under `-n auto`.
+- **Naming** — describe what's verified so a failure is legible from the report. Files: unit mirror the module (`test_<module>.py`), integration name the flow (`test_save_then_load.py`), e2e name the entrypoint/command (`test_cli_build.py`); the tier lives in the `tests/{unit,integration,e2e}/` dir, not the filename. Functions `test_<subject>_<scenario>_<expected>` (e.g. `test_compile_missing_ref_raises`) — not `test_1`/`test_it_works`; optional grouping `Test<Subject>`.
+- **Every change is tested** — every new/changed feature, bug fix, or other code change lands with at least one unit, one integration, and one e2e test exercising it (new or an updated existing one). A bug fix adds the regression test that would have caught it.
+- **Every feature is covered three ways** — happy path, negative (invalid input / expected errors), and edge cases (empty, boundary, limits). One passing case is not coverage.
+
 ### Structure
 
 ```
@@ -160,7 +170,30 @@ markers = [
 addopts = "-ra --strict-markers"
 ```
 
-Mark tests with `@pytest.mark.integration` / `@pytest.mark.e2e`. Run a tier: `uv run pytest -m integration`. Exclude: `uv run pytest -m "not e2e"`.
+Mark **every** test with its tier — `@pytest.mark.unit`, `@pytest.mark.integration`, or `@pytest.mark.e2e` — exactly one per test, so tier selection is explicit and no test silently escapes a tier filter. `--strict-markers` catches a mistyped tier (fails collection). Run a tier: `uv run pytest -m unit`. Exclude: `uv run pytest -m "not e2e"`.
+
+To tag a whole tier dir, don't use `pytestmark = pytest.mark.<tier>` in its `conftest.py` — it's **silently ignored** there (works only in a test *module*); tests still pass `--strict-markers` yet vanish under `-m <tier>`. Use a path-scoped hook instead:
+
+```python
+# tests/unit/conftest.py — tags every test under this dir
+_HERE = Path(__file__).parent
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if _HERE in item.path.parents:
+            item.add_marker(pytest.mark.unit)
+```
+
+That plus `--strict-markers` still misses a test dropped at `tests/` root, outside every tier dir. Catch it with a `trylast` guard (runs after the per-dir hooks) in the **root** `conftest.py`:
+
+```python
+# tests/conftest.py — fail collection on any test lacking exactly one tier
+_TIERS = {"unit", "integration", "e2e"}
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(items):
+    bad = [i.nodeid for i in items if len({m.name for m in i.iter_markers()} & _TIERS) != 1]
+    if bad:
+        raise pytest.UsageError("need exactly one tier marker:\n  " + "\n  ".join(bad))
+```
 
 ### Integration tests
 
@@ -201,6 +234,15 @@ def test_cli_build(tmp_path):
     r = run(["myapp", "build", "-o", str(tmp_path)], capture_output=True, text=True)
     assert r.returncode == 0
     assert (tmp_path / "out.json").exists()
+```
+
+### Anchor fixture paths to the repo root, not `__file__` depth
+
+`Path(__file__).parent.parent / "fixtures"` breaks the moment a test moves between tier dirs (which the layout above encourages). Walk up to a sentinel instead, so the path survives any nesting:
+
+```python
+_ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
+DEMO = _ROOT / "fixtures" / "demo"
 ```
 
 ### Running
@@ -269,6 +311,8 @@ uv run coverage combine && uv run coverage report --fail-under=90
 ## Definition of done
 
 - `ruff format --check`, `ruff check`, `ty check`, `vulture` all exit `0`.
-- `pytest` green across unit/integration/e2e tiers.
+- `pytest` green across unit/integration/e2e tiers — including under shuffled order and `-n auto` (proves independence).
+- Every test follows AAA structure, is order-independent, and is named per the conventions above.
+- The change ships with unit + integration + e2e tests covering happy-path, negative, and edge cases.
 - `--cov-fail-under=90` passes with `--cov-branch`.
 - Any suppression (`noqa`, `ty: ignore`, `pragma: no cover`, vulture whitelist entry) carries a one-line justification.
