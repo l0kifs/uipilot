@@ -70,8 +70,9 @@ def test_cli_script_flow():
 
 
 def test_cli_path_not_found_reports_reason():
-    result = runner.invoke(app, PACK + ["path", "--from", "act_cs_view_dashboard",
-                                        "--to", "act_pt_submit_withdrawal"])
+    result = runner.invoke(
+        app, PACK + ["path", "--from", "act_cs_view_dashboard", "--to", "act_pt_submit_withdrawal"]
+    )
     assert result.exit_code == 0
     assert json.loads(result.stdout)["found"] is False
 

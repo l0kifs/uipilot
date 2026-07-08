@@ -45,11 +45,11 @@ def expand_invocations(
     out: list[Invocation] = []
     for pstep in flow.path:
         if pstep.action:
-            out.append(Invocation(pstep.action, pstep.alias or alias_ctx,
-                                   dict(pstep.params), pstep.role))
+            out.append(
+                Invocation(pstep.action, pstep.alias or alias_ctx, dict(pstep.params), pstep.role)
+            )
         elif pstep.use:
-            out += expand_invocations(pack, pstep.use, depth + 1,
-                                      pstep.alias or alias_ctx, seen)
+            out += expand_invocations(pack, pstep.use, depth + 1, pstep.alias or alias_ctx, seen)
     return out
 
 

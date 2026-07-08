@@ -26,7 +26,7 @@ found errors · `2` usage error / not found.
 uipilot [--pack DIR] [--format json|table|md] <command> [opts]
 ```
 
-- `--pack`: pack dir. Default = `$UIPILOT_PACK` → cwd pack → bundled example.
+- `--pack`: pack dir. Default = `$UIPILOT_PACK` → `.uipilot/` in cwd → bundled example.
 - Keep `--format json` (default) for machine use; `table`/`md` are for humans.
 
 ## Command map

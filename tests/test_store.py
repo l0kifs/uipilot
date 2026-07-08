@@ -50,10 +50,15 @@ def test_selector_locator_rendering():
 
 def test_token_resolution_env_and_counter():
     from uipilot.domain.model import Config, Token
-    cfg = Config(pack="p", apps=[], tokens={
-        "prefix": Token("prefix", "env", name="TEST_ENTITY_PREFIX", default="fallback"),
-        "seq": Token("seq", "counter"),
-    })
+
+    cfg = Config(
+        pack="p",
+        apps=[],
+        tokens={
+            "prefix": Token("prefix", "env", name="TEST_ENTITY_PREFIX", default="fallback"),
+            "seq": Token("seq", "counter"),
+        },
+    )
     ctx = RuntimeContext(cfg, env={"TEST_ENTITY_PREFIX": "acme"})
     assert ctx.token("prefix") == "acme"
     # counter is stable within a run (cached on first access)

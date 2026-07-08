@@ -44,9 +44,7 @@ def _pack_on_path(pack_root: Optional[Path]):
 
 def _import_impl(impl: str, pack_root: Optional[Path]) -> Callable:
     if ":" not in impl:
-        raise CapabilityError(
-            f"capability impl '{impl}' must be 'module.path:function'"
-        )
+        raise CapabilityError(f"capability impl '{impl}' must be 'module.path:function'")
     module_name, _, func_name = impl.partition(":")
     with _pack_on_path(pack_root):
         try:
@@ -56,9 +54,7 @@ def _import_impl(impl: str, pack_root: Optional[Path]) -> Callable:
         try:
             func = getattr(module, func_name)
         except AttributeError as exc:
-            raise CapabilityError(
-                f"'{module_name}' has no attribute '{func_name}'"
-            ) from exc
+            raise CapabilityError(f"'{module_name}' has no attribute '{func_name}'") from exc
     if not callable(func):
         raise CapabilityError(f"capability '{impl}' is not callable")
     return func

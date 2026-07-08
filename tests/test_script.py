@@ -25,8 +25,12 @@ def test_secret_never_echoed_but_listed_required(pack, ctx):
 
 
 def test_secret_materialises_only_in_consuming_step(pack, ctx):
-    s = compile_flow(pack, ctx, "create_project_with_credential",
-                     overrides={"password": "hunter2", "mfa_code": "000111"})
+    s = compile_flow(
+        pack,
+        ctx,
+        "create_project_with_credential",
+        overrides={"password": "hunter2", "mfa_code": "000111"},
+    )
     # echoed header still hides the secret
     assert s.params["password"] == "{{password}}"
     # but the consuming fill step carries the real value

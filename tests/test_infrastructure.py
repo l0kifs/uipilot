@@ -91,8 +91,9 @@ def test_parse_path_step_variants_and_errors():
     assert pl._parse_path_step("act_x", where="f").action == "act_x"
     use = pl._parse_path_step({"use": "sub", "as": "al", "args": {"k": "v"}}, where="f")
     assert use.use == "sub" and use.alias == "al" and use.params == {"k": "v"}
-    act = pl._parse_path_step({"action": "a", "role": "crosscheck", "params": {"p": 1},
-                               "args": {"q": 2}}, where="f")
+    act = pl._parse_path_step(
+        {"action": "a", "role": "crosscheck", "params": {"p": 1}, "args": {"q": 2}}, where="f"
+    )
     assert act.role == "crosscheck" and act.params == {"p": 1, "q": 2}
     with pytest.raises(PackError, match="string or mapping"):
         pl._parse_path_step(123, where="f")
@@ -115,8 +116,9 @@ def test_parse_action_and_flow_type_errors():
 def test_parse_app_header_requires_id():
     with pytest.raises(PackError, match="needs an 'id'"):
         pl._parse_app_header({"id_prefix": "x"})
-    app = pl._parse_app_header({
-        "id": "web", "auth": {"entry_flow": "sign_in", "storage_state_key": "web"}})
+    app = pl._parse_app_header(
+        {"id": "web", "auth": {"entry_flow": "sign_in", "storage_state_key": "web"}}
+    )
     assert app.auth.entry_flow == "sign_in"
 
 
@@ -136,6 +138,7 @@ def test_parse_config_requires_apps_and_capability_impl():
 
 def _copy_demo(tmp_path):
     import shutil
+
     shutil.copytree(DEMO, tmp_path, dirs_exist_ok=True)
     return tmp_path
 
@@ -196,12 +199,15 @@ def test_capability_resolves_and_caches():
 
 
 def test_capability_binding_errors():
-    reg = _reg({
-        "no_colon": "justmodule",
-        "bad_module": "no_such_module_xyz:fn",
-        "bad_attr": "capabilities:missing_fn",
-        "not_callable": "capabilities:__doc__",
-    }, root=DEMO)
+    reg = _reg(
+        {
+            "no_colon": "justmodule",
+            "bad_module": "no_such_module_xyz:fn",
+            "bad_attr": "capabilities:missing_fn",
+            "not_callable": "capabilities:__doc__",
+        },
+        root=DEMO,
+    )
     checks = reg.check_all()
     assert "must be 'module.path:function'" in checks["no_colon"]
     assert "cannot import" in checks["bad_module"]

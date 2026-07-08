@@ -75,46 +75,86 @@ def _lint_actions(pack: Pack, out: list[Finding]) -> None:
     for action in pack.actions.values():
         # E_UNKNOWN_RISK
         if action.risk and action.risk not in levels:
-            out.append(Finding(ERROR, "E_UNKNOWN_RISK", action.id,
-                               f"risk '{action.risk}' not in taxonomy {sorted(levels)}"))
+            out.append(
+                Finding(
+                    ERROR,
+                    "E_UNKNOWN_RISK",
+                    action.id,
+                    f"risk '{action.risk}' not in taxonomy {sorted(levels)}",
+                )
+            )
 
         if action.is_api:
             # E_API_CALL_UNBOUND — the reuse guard: api actions bind to an
             # existing factory/client, never embed their own HTTP.
             if not action.call or ":" not in action.call:
-                out.append(Finding(ERROR, "E_API_CALL_UNBOUND", action.id,
-                                   "api action 'call' must bind to 'module:function'"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_API_CALL_UNBOUND",
+                        action.id,
+                        "api action 'call' must bind to 'module:function'",
+                    )
+                )
             if action.role and action.role not in ("setup", "crosscheck"):
-                out.append(Finding(ERROR, "E_BAD_API_ROLE", action.id,
-                                   f"api role '{action.role}' is not setup|crosscheck"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_BAD_API_ROLE",
+                        action.id,
+                        f"api role '{action.role}' is not setup|crosscheck",
+                    )
+                )
             continue
 
         # --- UI actions ---
         # E_DANGLING_ELEMENT
         for eid in action.elements:
             if eid not in pack.elements:
-                out.append(Finding(ERROR, "E_DANGLING_ELEMENT", action.id,
-                                   f"references missing element {eid}"))
+                out.append(
+                    Finding(
+                        ERROR, "E_DANGLING_ELEMENT", action.id, f"references missing element {eid}"
+                    )
+                )
         # Steps referencing undeclared elements too.
         for step in action.steps:
             if step.element and step.element not in pack.elements:
-                out.append(Finding(ERROR, "E_DANGLING_ELEMENT", action.id,
-                                   f"step references missing element {step.element}"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_DANGLING_ELEMENT",
+                        action.id,
+                        f"step references missing element {step.element}",
+                    )
+                )
 
         # E_BROKEN_EDGE
         for edge_kind in ("prev", "next"):
             for target in getattr(action, edge_kind):
                 if target not in pack.actions:
-                    out.append(Finding(ERROR, "E_BROKEN_EDGE", action.id,
-                                       f"{edge_kind}: {target} does not exist"))
+                    out.append(
+                        Finding(
+                            ERROR,
+                            "E_BROKEN_EDGE",
+                            action.id,
+                            f"{edge_kind}: {target} does not exist",
+                        )
+                    )
                 elif pack.actions[target].is_api:
-                    out.append(Finding(ERROR, "E_BROKEN_EDGE", action.id,
-                                       f"{edge_kind}: {target} is an API action (not a nav node)"))
+                    out.append(
+                        Finding(
+                            ERROR,
+                            "E_BROKEN_EDGE",
+                            action.id,
+                            f"{edge_kind}: {target} is an API action (not a nav node)",
+                        )
+                    )
 
         # W_NO_STEPS
         if action.elements and not action.steps:
-            out.append(Finding(WARNING, "W_NO_STEPS", action.id,
-                               "action has elements but no step recipe"))
+            out.append(
+                Finding(WARNING, "W_NO_STEPS", action.id, "action has elements but no step recipe")
+            )
 
         # E_PARAM_UNDECLARED — step template refs must resolve to a param/token.
         declared = {p.key for p in action.params}
@@ -127,16 +167,28 @@ def _lint_actions(pack: Pack, out: list[Finding]) -> None:
                 if "." in ref or ref == "base_url":
                     continue  # runtime capture / injected base url
                 if ref not in declared and ref not in tokens:
-                    out.append(Finding(ERROR, "E_PARAM_UNDECLARED", action.id,
-                                       f"step uses {{{{{ref}}}}} with no matching param"))
+                    out.append(
+                        Finding(
+                            ERROR,
+                            "E_PARAM_UNDECLARED",
+                            action.id,
+                            f"step uses {{{{{ref}}}}} with no matching param",
+                        )
+                    )
 
         # W_DUPLICATE_RECIPE
         if action.steps:
             sig = tuple((s.op, s.element, s.value, s.scope) for s in action.steps)
             if sig in seen_recipes:
-                out.append(Finding(WARNING, "W_DUPLICATE_RECIPE", action.id,
-                                   f"identical step recipe to {seen_recipes[sig]} "
-                                   "— likely a missed shared action"))
+                out.append(
+                    Finding(
+                        WARNING,
+                        "W_DUPLICATE_RECIPE",
+                        action.id,
+                        f"identical step recipe to {seen_recipes[sig]} "
+                        "— likely a missed shared action",
+                    )
+                )
             else:
                 seen_recipes[sig] = action.id
 
@@ -152,8 +204,14 @@ def _lint_selectors(pack: Pack, out: list[Finding]) -> None:
         if len(ids) > 1:
             first, *rest = sorted(ids)
             for eid in rest:
-                out.append(Finding(ERROR, "E_SELECTOR_AMBIGUOUS", eid,
-                                   f"identical selector to {first}; add scope/exact name"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_SELECTOR_AMBIGUOUS",
+                        eid,
+                        f"identical selector to {first}; add scope/exact name",
+                    )
+                )
 
 
 def _lint_captures(pack: Pack, out: list[Finding]) -> None:
@@ -173,8 +231,14 @@ def _lint_captures(pack: Pack, out: list[Finding]) -> None:
                 continue
             cap_key = ref.split(".", 1)[1]
             if cap_key not in produced:
-                out.append(Finding(WARNING, "W_NO_CAPTURE", ref_owner,
-                                   f"consumes {{{{{ref}}}}} that no action produces"))
+                out.append(
+                    Finding(
+                        WARNING,
+                        "W_NO_CAPTURE",
+                        ref_owner,
+                        f"consumes {{{{{ref}}}}} that no action produces",
+                    )
+                )
 
     for action in pack.actions.values():
         for step in action.steps:
@@ -207,17 +271,23 @@ def _lint_flows(pack: Pack, out: list[Finding]) -> None:
     for fid, flow in pack.flows.items():
         # E_SUBFLOW_CYCLE
         if _has_cycle(fid):
-            out.append(Finding(ERROR, "E_SUBFLOW_CYCLE", fid,
-                               "a 'use:' reference recurses"))
+            out.append(Finding(ERROR, "E_SUBFLOW_CYCLE", fid, "a 'use:' reference recurses"))
 
         # Unknown refs in the path.
         for pstep in flow.path:
             if pstep.action and pstep.action not in pack.actions:
-                out.append(Finding(ERROR, "E_BROKEN_EDGE", fid,
-                                   f"path references missing action {pstep.action}"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_BROKEN_EDGE",
+                        fid,
+                        f"path references missing action {pstep.action}",
+                    )
+                )
             if pstep.use and pstep.use not in pack.flows:
-                out.append(Finding(ERROR, "E_BROKEN_EDGE", fid,
-                                   f"path uses missing flow {pstep.use}"))
+                out.append(
+                    Finding(ERROR, "E_BROKEN_EDGE", fid, f"path uses missing flow {pstep.use}")
+                )
 
         # E_CAPTURE_COLLISION — an action/subflow that produces captures runs
         # more than once in a flow without an ``as:`` alias.
@@ -231,9 +301,14 @@ def _lint_flows(pack: Pack, out: list[Finding]) -> None:
             counts[aid] = counts.get(aid, 0) + 1
         for aid, n in counts.items():
             if n > 1:
-                out.append(Finding(ERROR, "E_CAPTURE_COLLISION", fid,
-                                   f"{aid} runs {n}x without an 'as:' alias; "
-                                   "captures overwrite"))
+                out.append(
+                    Finding(
+                        ERROR,
+                        "E_CAPTURE_COLLISION",
+                        fid,
+                        f"{aid} runs {n}x without an 'as:' alias; captures overwrite",
+                    )
+                )
 
         # W_UNMET_REQUIRES — reach an action needing a capability with no
         # earlier provider in this path.
@@ -246,8 +321,14 @@ def _lint_flows(pack: Pack, out: list[Finding]) -> None:
                 if need not in provided:
                     providers = [a.id for a in pack.actions.values() if need in a.provides]
                     hint = f" → {', '.join(providers)}" if providers else ""
-                    out.append(Finding(WARNING, "W_UNMET_REQUIRES", fid,
-                                       f"{aid} requires '{need}' with no provider in path{hint}"))
+                    out.append(
+                        Finding(
+                            WARNING,
+                            "W_UNMET_REQUIRES",
+                            fid,
+                            f"{aid} requires '{need}' with no provider in path{hint}",
+                        )
+                    )
             provided.update(action.provides)
 
 
@@ -260,8 +341,11 @@ def _lint_reachability(pack: Pack, out: list[Finding]) -> None:
     reachable = reachable_actions(pack)
     for action in pack.ui_actions():
         if action.id not in reachable:
-            out.append(Finding(WARNING, "W_UNREACHABLE", action.id,
-                               "no path from any auth entry flow or root"))
+            out.append(
+                Finding(
+                    WARNING, "W_UNREACHABLE", action.id, "no path from any auth entry flow or root"
+                )
+            )
 
 
 def _lint_coverage(pack: Pack, out: list[Finding]) -> None:
@@ -284,9 +368,15 @@ def _lint_coverage(pack: Pack, out: list[Finding]) -> None:
         if action.id in ui_in_flows:
             continue
         if any(cap in api_setup_caps for cap in action.provides):
-            out.append(Finding(WARNING, "W_UI_COVERAGE_BYPASS", action.id,
-                               "provisioned via an API setup action but never "
-                               "exercised through the UI in any flow"))
+            out.append(
+                Finding(
+                    WARNING,
+                    "W_UI_COVERAGE_BYPASS",
+                    action.id,
+                    "provisioned via an API setup action but never "
+                    "exercised through the UI in any flow",
+                )
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -309,6 +399,7 @@ def validate(pack: Pack, app: Optional[str] = None) -> ValidationReport:
     _lint_coverage(pack, out)
 
     if app is not None:
+
         def _in_scope(f: Finding) -> bool:
             a = pack.action(f.ref)
             e = pack.element(f.ref)
@@ -317,6 +408,7 @@ def validate(pack: Pack, app: Optional[str] = None) -> ValidationReport:
             if e is not None:
                 return e.app == app
             return True  # flow-level findings are kept
+
         out = [f for f in out if _in_scope(f)]
 
     # errors first, then warnings; stable within a severity.

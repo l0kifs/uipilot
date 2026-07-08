@@ -34,7 +34,8 @@ def uses(pack: Pack, ref: str) -> dict:
                 action_ids.add(action.id)
         flows = _flows_containing_actions(pack, action_ids)
         return {
-            "id": ref, "kind": "element",
+            "id": ref,
+            "kind": "element",
             "used_by_actions": used_by_actions,
             "used_by_flows": flows,
             "impact": f"{len(used_by_actions)} action(s), {len(flows)} flow(s)",
@@ -44,10 +45,10 @@ def uses(pack: Pack, ref: str) -> dict:
         action = pack.actions[ref]
         flows = _flows_containing_actions(pack, {ref})
         neighbours = {"prev": action.prev, "next": action.next}
-        referenced_by = [a.id for a in pack.actions.values()
-                         if ref in a.prev or ref in a.next]
+        referenced_by = [a.id for a in pack.actions.values() if ref in a.prev or ref in a.next]
         return {
-            "id": ref, "kind": "action",
+            "id": ref,
+            "kind": "action",
             "used_by_flows": flows,
             "neighbours": neighbours,
             "referenced_by_edges": sorted(referenced_by),
@@ -60,7 +61,8 @@ def uses(pack: Pack, ref: str) -> dict:
             if any(p.use == ref for p in flow.path):
                 used_by_flows.append(fid)
         return {
-            "id": ref, "kind": "flow",
+            "id": ref,
+            "kind": "flow",
             "used_by_flows": sorted(used_by_flows),
             "impact": f"{len(used_by_flows)} flow(s) embed this subflow",
         }

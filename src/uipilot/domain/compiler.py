@@ -48,8 +48,16 @@ class CompiledStep:
 
     def as_dict(self, *, with_mcp: bool = True) -> dict:
         out: dict = {"n": self.n, "op": self.op}
-        for key in ("action", "element", "selector", "value", "capture",
-                    "from_", "pattern", "note"):
+        for key in (
+            "action",
+            "element",
+            "selector",
+            "value",
+            "capture",
+            "from_",
+            "pattern",
+            "note",
+        ):
             val = getattr(self, key)
             if val is not None:
                 out[key.rstrip("_") if key == "from_" else key] = val
@@ -107,10 +115,15 @@ class CompiledScript:
 
 
 class _Compiler:
-    def __init__(self, pack: Pack, ctx: RuntimeContext,
-                 overrides: Optional[dict] = None,
-                 skip_auth: bool = False, batch: bool = False,
-                 refuse_destructive: bool = False) -> None:
+    def __init__(
+        self,
+        pack: Pack,
+        ctx: RuntimeContext,
+        overrides: Optional[dict] = None,
+        skip_auth: bool = False,
+        batch: bool = False,
+        refuse_destructive: bool = False,
+    ) -> None:
         self.pack = pack
         self.ctx = ctx
         self.overrides = overrides or {}
@@ -161,8 +174,7 @@ class _Compiler:
             return placeholder, step_value, missing
         return resolved, resolved, missing
 
-    def _build_param_map(self, action: Action, inv_params: dict,
-                         flow_defaults: dict) -> dict:
+    def _build_param_map(self, action: Action, inv_params: dict, flow_defaults: dict) -> dict:
         pmap: dict[str, str] = {}
         for param in action.params:
             echo, step_value, missing = self._resolve_param(param, inv_params, flow_defaults)
@@ -184,8 +196,9 @@ class _Compiler:
 
     # -- step emission ------------------------------------------------------
 
-    def _mcp_for(self, op: str, *, url=None, desc=None, value=None,
-                 wait_for=None, key=None, args=None) -> Optional[dict]:
+    def _mcp_for(
+        self, op: str, *, url=None, desc=None, value=None, wait_for=None, key=None, args=None
+    ) -> Optional[dict]:
         args = args or {}
         if op == "navigate":
             return {"tool": "browser_navigate", "args": {"url": url}}
@@ -194,15 +207,18 @@ class _Compiler:
         if op == "click":
             return {"tool": "browser_click", "args": {"element": desc, "ref": "@snapshot"}}
         if op in ("fill", "type"):
-            return {"tool": "browser_type",
-                    "args": {"element": desc, "ref": "@snapshot", "text": value}}
+            return {
+                "tool": "browser_type",
+                "args": {"element": desc, "ref": "@snapshot", "text": value},
+            }
         if op == "select":
             values = args.get("values") or ([value] if value else [])
-            return {"tool": "browser_select_option",
-                    "args": {"element": desc, "ref": "@snapshot", "values": values}}
+            return {
+                "tool": "browser_select_option",
+                "args": {"element": desc, "ref": "@snapshot", "values": values},
+            }
         if op == "press":
-            return {"tool": "browser_press_key",
-                    "args": {"key": args.get("key") or value or key}}
+            return {"tool": "browser_press_key", "args": {"key": args.get("key") or value or key}}
         if op == "wait_for":
             return {"tool": "browser_wait_for", "args": wait_for or {}}
         if op == "expect":
@@ -217,10 +233,16 @@ class _Compiler:
 
     # -- main ---------------------------------------------------------------
 
-    def compile(self, invocations: list[Invocation], *, name: str,
-                flow_params=None, flow_defaults=None,
-                primary_app: Optional[str] = None,
-                teardown_invs: Optional[list[Invocation]] = None) -> CompiledScript:
+    def compile(
+        self,
+        invocations: list[Invocation],
+        *,
+        name: str,
+        flow_params=None,
+        flow_defaults=None,
+        primary_app: Optional[str] = None,
+        teardown_invs: Optional[list[Invocation]] = None,
+    ) -> CompiledScript:
         flow_params = flow_params or []
         flow_defaults = flow_defaults or {p.key: p.default for p in flow_params}
         self._register_flow_params(flow_params, flow_defaults)
@@ -259,8 +281,11 @@ class _Compiler:
                     apps_seen.append(action.app)
                 ui_invs.append(inv)
 
-        primary_app = primary_app or (apps_seen[0] if apps_seen else
-                                      (self.pack.config.apps[0] if self.pack.config.apps else ""))
+        primary_app = primary_app or (
+            apps_seen[0]
+            if apps_seen
+            else (self.pack.config.apps[0] if self.pack.config.apps else "")
+        )
 
         # Refuse-destructive gate.
         refused = None
@@ -268,8 +293,10 @@ class _Compiler:
         if self.refuse_destructive:
             offending = sorted({r for r in risks if r in gated})
             if offending:
-                refused = (f"path carries gated risk {offending}; "
-                           "re-run without --refuse-destructive to emit")
+                refused = (
+                    f"path carries gated risk {offending}; "
+                    "re-run without --refuse-destructive to emit"
+                )
 
         # Preconditions: API setups first, then auth.
         preconditions: list[dict] = list(setup_pre)
@@ -320,16 +347,20 @@ class _Compiler:
             action = self.pack.action(inv.action_id)
             if action is None or not action.is_api:
                 continue
-            args = {p.key: self._resolve_param(p, inv.params, flow_defaults or {})[1]
-                    for p in action.params}
-            entries.append({
-                "kind": "api_action",
-                "id": action.id,
-                "call": action.call,
-                "args": args,
-                "risk": action.risk,
-                "run_by": "agent",
-            })
+            args = {
+                p.key: self._resolve_param(p, inv.params, flow_defaults or {})[1]
+                for p in action.params
+            }
+            entries.append(
+                {
+                    "kind": "api_action",
+                    "id": action.id,
+                    "call": action.call,
+                    "args": args,
+                    "risk": action.risk,
+                    "run_by": "agent",
+                }
+            )
         return entries
 
     def _resolve_args(self, action: Action, pmap: dict) -> dict:
@@ -356,8 +387,10 @@ class _Compiler:
             "kind": "auth",
             "flow": entry_flow,
             "storage_state_key": key,
-            "hint": (f"reuse Playwright storageState '{key}' if present and fresh; "
-                     "else run the sign-in subflow and re-save state"),
+            "hint": (
+                f"reuse Playwright storageState '{key}' if present and fresh; "
+                "else run the sign-in subflow and re-save state"
+            ),
             "run_by": "agent",
         }
         return [pre], [primary_app]
@@ -368,8 +401,7 @@ class _Compiler:
         needs_snapshot = True
 
         def emit_snapshot():
-            steps.append(CompiledStep(n=0, op="snapshot",
-                                      mcp=self._mcp_for("snapshot")))
+            steps.append(CompiledStep(n=0, op="snapshot", mcp=self._mcp_for("snapshot")))
 
         for inv in ui_invs:
             action = self.pack.action(inv.action_id)
@@ -381,10 +413,20 @@ class _Compiler:
 
             # Synthesised navigation (deduped against the current route).
             if action.route and action.route != current_route:
-                url = (base_url.rstrip("/") + action.route) if base_url else \
-                    "{{base_url}}" + action.route
-                steps.append(CompiledStep(n=0, op="navigate", action=action.id,
-                                          value=url, mcp=self._mcp_for("navigate", url=url)))
+                url = (
+                    (base_url.rstrip("/") + action.route)
+                    if base_url
+                    else "{{base_url}}" + action.route
+                )
+                steps.append(
+                    CompiledStep(
+                        n=0,
+                        op="navigate",
+                        action=action.id,
+                        value=url,
+                        mcp=self._mcp_for("navigate", url=url),
+                    )
+                )
                 current_route = action.route
                 needs_snapshot = True
 
@@ -407,11 +449,17 @@ class _Compiler:
             for cap in action.captures:
                 self._produced_captures.add(cap.key)
                 key = f"{inv.alias}.{cap.key}" if inv.alias else cap.key
-                steps.append(CompiledStep(
-                    n=0, op="capture", action=action.id,
-                    capture=key, from_=cap.from_, pattern=cap.pattern,
-                    mcp=self._mcp_for("capture", key=key),
-                ))
+                steps.append(
+                    CompiledStep(
+                        n=0,
+                        op="capture",
+                        action=action.id,
+                        capture=key,
+                        from_=cap.from_,
+                        pattern=cap.pattern,
+                        mcp=self._mcp_for("capture", key=key),
+                    )
+                )
 
         return steps
 
@@ -444,12 +492,17 @@ class _Compiler:
         if step.op == "expect":
             note = f"assert element resolves: {desc}"
 
-        mcp = self._mcp_for(step.op, desc=desc, value=value, wait_for=wait_for,
-                            args=step.args)
+        mcp = self._mcp_for(step.op, desc=desc, value=value, wait_for=wait_for, args=step.args)
         return CompiledStep(
-            n=0, op=step.op, action=action.id, element=step.element,
-            selector=selector, value=value, optional=step.optional,
-            mcp=mcp, note=note,
+            n=0,
+            op=step.op,
+            action=action.id,
+            element=step.element,
+            selector=selector,
+            value=value,
+            optional=step.optional,
+            mcp=mcp,
+            note=note,
         )
 
     def _collapse_fills(self, steps: list[CompiledStep]) -> list[CompiledStep]:
@@ -463,17 +516,24 @@ class _Compiler:
             if len(run) == 1:
                 out.append(run[0])
             else:
-                fields = [{
-                    "name": s.selector.get("name") if s.selector else s.element,
-                    "type": "textbox",
-                    "ref": "@snapshot",
-                    "value": s.value,
-                } for s in run]
-                out.append(CompiledStep(
-                    n=0, op="fill_form", action=run[0].action,
-                    mcp={"tool": "browser_fill_form", "args": {"fields": fields}},
-                    note=f"batched {len(run)} field fills",
-                ))
+                fields = [
+                    {
+                        "name": s.selector.get("name") if s.selector else s.element,
+                        "type": "textbox",
+                        "ref": "@snapshot",
+                        "value": s.value,
+                    }
+                    for s in run
+                ]
+                out.append(
+                    CompiledStep(
+                        n=0,
+                        op="fill_form",
+                        action=run[0].action,
+                        mcp={"tool": "browser_fill_form", "args": {"fields": fields}},
+                        note=f"batched {len(run)} field fills",
+                    )
+                )
             run.clear()
 
         for step in steps:
@@ -497,23 +557,33 @@ def compile_flow(pack: Pack, ctx: RuntimeContext, flow_id: str, **kw) -> Compile
         raise KeyError(f"no flow named '{flow_id}'")
     invs = expand_invocations(pack, flow_id)
     flow_defaults = {p.key: p.default for p in flow.params}
-    teardown_invs = [Invocation(ps.action, ps.alias, dict(ps.params), ps.role)
-                     for ps in flow.teardown if ps.action]
+    teardown_invs = [
+        Invocation(ps.action, ps.alias, dict(ps.params), ps.role)
+        for ps in flow.teardown
+        if ps.action
+    ]
     comp = _Compiler(pack, ctx, **kw)
-    return comp.compile(invs, name=flow_id, flow_params=flow.params,
-                        flow_defaults=flow_defaults, primary_app=flow.app,
-                        teardown_invs=teardown_invs)
+    return comp.compile(
+        invs,
+        name=flow_id,
+        flow_params=flow.params,
+        flow_defaults=flow_defaults,
+        primary_app=flow.app,
+        teardown_invs=teardown_invs,
+    )
 
 
-def compile_actions(pack: Pack, ctx: RuntimeContext, action_ids: list[str],
-                    *, name: str = "adhoc", **kw) -> CompiledScript:
+def compile_actions(
+    pack: Pack, ctx: RuntimeContext, action_ids: list[str], *, name: str = "adhoc", **kw
+) -> CompiledScript:
     invs = [Invocation(aid, None, {}, None) for aid in action_ids]
     comp = _Compiler(pack, ctx, **kw)
     return comp.compile(invs, name=name)
 
 
-def compile_path(pack: Pack, ctx: RuntimeContext, src: str, dst: str,
-                 max_depth: int = 25, **kw) -> CompiledScript:
+def compile_path(
+    pack: Pack, ctx: RuntimeContext, src: str, dst: str, max_depth: int = 25, **kw
+) -> CompiledScript:
     result = find_path(pack, src, dst, max_depth=max_depth)
     if not result.found:
         raise KeyError(result.reason or "no path")

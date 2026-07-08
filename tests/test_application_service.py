@@ -15,9 +15,14 @@ from uipilot.application.service import PackContext, open_pack
 
 
 def test_open_pack_builds_runtime_context():
-    pctx = open_pack(str(pytest.importorskip("pathlib").Path(__file__).resolve()
-                         .parent.parent / "examples" / "demo"),
-                     env={"TEST_ENTITY_PREFIX": "demo"})
+    pctx = open_pack(
+        str(
+            pytest.importorskip("pathlib").Path(__file__).resolve().parent.parent
+            / "examples"
+            / "demo"
+        ),
+        env={"TEST_ENTITY_PREFIX": "demo"},
+    )
     assert isinstance(pctx, PackContext)
     assert pctx.pack.config.pack == "demo"
     # env is threaded into token resolution
@@ -27,6 +32,7 @@ def test_open_pack_builds_runtime_context():
 def test_open_pack_defaults_to_os_environ(monkeypatch):
     monkeypatch.setenv("TEST_ENTITY_PREFIX", "envval")
     from pathlib import Path
+
     pctx = open_pack(Path(__file__).resolve().parent.parent / "examples" / "demo")
     assert pctx.runtime.token("prefix") == "envval"
 
@@ -34,8 +40,10 @@ def test_open_pack_defaults_to_os_environ(monkeypatch):
 @pytest.fixture
 def pctx(pack):
     from uipilot.domain.templating import RuntimeContext
-    return PackContext(pack=pack, runtime=RuntimeContext(pack.config,
-                                                         env={"TEST_ENTITY_PREFIX": "demo"}))
+
+    return PackContext(
+        pack=pack, runtime=RuntimeContext(pack.config, env={"TEST_ENTITY_PREFIX": "demo"})
+    )
 
 
 # --- queries ---------------------------------------------------------------
@@ -87,8 +95,7 @@ def test_uses_delegates(pctx):
 def test_compile_script_via_flow_path_actions(pctx):
     by_flow = service.compile_script(pctx, flow="create_project_with_credential")
     assert by_flow.name == "create_project_with_credential"
-    by_path = service.compile_script(pctx, src="act_cs_open_projects",
-                                     dst="act_cs_create_project")
+    by_path = service.compile_script(pctx, src="act_cs_open_projects", dst="act_cs_create_project")
     assert by_path.steps
     by_actions = service.compile_script(pctx, actions=["act_cs_open_projects"])
     assert by_actions.name == "adhoc"

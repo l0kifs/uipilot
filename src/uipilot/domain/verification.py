@@ -32,9 +32,9 @@ def _route_groups(pack: Pack, actions: list[Action]) -> list[tuple[Optional[str]
     return groups
 
 
-def _probe_steps(pack: Pack, ctx: RuntimeContext,
-                 groups: list[tuple[Optional[str], list[str]]],
-                 app_id: str) -> list[dict]:
+def _probe_steps(
+    pack: Pack, ctx: RuntimeContext, groups: list[tuple[Optional[str], list[str]]], app_id: str
+) -> list[dict]:
     app = pack.app(app_id)
     base_url = ctx.base_url(app) if app else ""
     steps: list[dict] = []
@@ -44,23 +44,33 @@ def _probe_steps(pack: Pack, ctx: RuntimeContext,
         if route is not None and route != current_route:
             url = (base_url.rstrip("/") + route) if base_url else "{{base_url}}" + route
             n += 1
-            steps.append({"n": n, "op": "navigate",
-                          "mcp": {"tool": "browser_navigate", "args": {"url": url}}})
+            steps.append(
+                {
+                    "n": n,
+                    "op": "navigate",
+                    "mcp": {"tool": "browser_navigate", "args": {"url": url}},
+                }
+            )
             n += 1
-            steps.append({"n": n, "op": "snapshot",
-                          "mcp": {"tool": "browser_snapshot", "args": {}}})
+            steps.append(
+                {"n": n, "op": "snapshot", "mcp": {"tool": "browser_snapshot", "args": {}}}
+            )
             current_route = route
         for eid in elems:
             el = pack.element(eid)
             if el is None:
                 continue
             n += 1
-            steps.append({
-                "n": n, "op": "expect", "element": eid,
-                "selector": el.selector.as_dict(),
-                "assert": "element resolves in latest snapshot",
-                "mcp": {"tool": "browser_snapshot", "args": {}},
-            })
+            steps.append(
+                {
+                    "n": n,
+                    "op": "expect",
+                    "element": eid,
+                    "selector": el.selector.as_dict(),
+                    "assert": "element resolves in latest snapshot",
+                    "mcp": {"tool": "browser_snapshot", "args": {}},
+                }
+            )
     return steps
 
 
@@ -87,8 +97,11 @@ def verify_probe(
         app_id = flow_obj.app or (actions[0].app if actions else "")
         groups = _route_groups(pack, actions)
         return {
-            "mode": "probe", "scope": {"flow": flow}, "read_only": True,
-            "app": app_id, "steps": _probe_steps(pack, ctx, groups, app_id),
+            "mode": "probe",
+            "scope": {"flow": flow},
+            "read_only": True,
+            "app": app_id,
+            "steps": _probe_steps(pack, ctx, groups, app_id),
         }
     if action:
         act = pack.action(action)
@@ -96,8 +109,11 @@ def verify_probe(
             raise KeyError(f"no action named '{action}'")
         groups = _route_groups(pack, [act])
         return {
-            "mode": "probe", "scope": {"action": action}, "read_only": True,
-            "app": act.app, "steps": _probe_steps(pack, ctx, groups, act.app),
+            "mode": "probe",
+            "scope": {"action": action},
+            "read_only": True,
+            "app": act.app,
+            "steps": _probe_steps(pack, ctx, groups, act.app),
         }
     if app:
         if app not in pack.apps:
@@ -106,8 +122,11 @@ def verify_probe(
         actions.sort(key=lambda a: (a.route or "", a.id))
         groups = _route_groups(pack, actions)
         return {
-            "mode": "probe", "scope": {"app": app}, "read_only": True,
-            "app": app, "steps": _probe_steps(pack, ctx, groups, app),
+            "mode": "probe",
+            "scope": {"app": app},
+            "read_only": True,
+            "app": app,
+            "steps": _probe_steps(pack, ctx, groups, app),
         }
     raise ValueError("verify needs one of --flow, --app, or --action")
 
@@ -134,7 +153,10 @@ def _drive(pack: Pack, ctx: RuntimeContext, flow: str, allow_gated: bool) -> dic
         ),
         "app": script.app,
         "refused_gated": refused,
-        "note": ("gated steps refused; pass --allow-gated to include them"
-                 if refused and not allow_gated else None),
+        "note": (
+            "gated steps refused; pass --allow-gated to include them"
+            if refused and not allow_gated
+            else None
+        ),
         "steps": kept_steps,
     }

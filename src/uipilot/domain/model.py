@@ -88,8 +88,16 @@ class Selector:
 
     def signature(self) -> tuple:
         """Identity used to detect ambiguous/duplicate selectors."""
-        return (self.strategy, self.role, self.name, self.text, self.label,
-                self.css, self.testid, self.scope)
+        return (
+            self.strategy,
+            self.role,
+            self.name,
+            self.text,
+            self.label,
+            self.css,
+            self.testid,
+            self.scope,
+        )
 
     def as_dict(self) -> dict:
         """Non-null fields as a plain dict, for JSON output and re-emission."""
@@ -139,8 +147,17 @@ class Param:
 
 # Step ops and their Playwright-MCP tool mapping (see design §6).
 STEP_OPS = (
-    "navigate", "snapshot", "click", "fill", "type", "select",
-    "press", "wait_for", "expect", "capture", "upload",
+    "navigate",
+    "snapshot",
+    "click",
+    "fill",
+    "type",
+    "select",
+    "press",
+    "wait_for",
+    "expect",
+    "capture",
+    "upload",
 )
 
 # Ops that interact with a live element and therefore need a fresh snapshot ref.

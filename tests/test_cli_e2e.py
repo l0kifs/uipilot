@@ -83,8 +83,11 @@ def test_actions_filter_by_grep_and_app_and_section():
     data = json.loads(run("actions", "--grep", "withdraw").stdout)
     assert any("withdraw" in a["id"] for a in data["actions"])
     scoped = json.loads(run("actions", "--app", "console").stdout)
-    assert all(a["id"].startswith(("act_cs", "api_create_project", "api_create_cred"))
-               or a["transport"] == "api" for a in scoped["actions"])
+    assert all(
+        a["id"].startswith(("act_cs", "api_create_project", "api_create_cred"))
+        or a["transport"] == "api"
+        for a in scoped["actions"]
+    )
     sect = json.loads(run("actions", "--section", "Sign in").stdout)
     assert any("sign_in" in a["id"] for a in sect["actions"])
 
@@ -187,7 +190,7 @@ def test_flow_params_manifest_aggregates_and_marks_secrets():
     mfa = next(p for p in data["params"] if p["key"] == "mfa_code")
     assert mfa["secret"] is True
     assert mfa["satisfied_by"] == "totp"
-    assert mfa["default"] is None            # secret default never echoed
+    assert mfa["default"] is None  # secret default never echoed
 
 
 # ---------------------------------------------------------------------------
@@ -196,12 +199,14 @@ def test_flow_params_manifest_aggregates_and_marks_secrets():
 
 
 def test_path_found_and_not_found():
-    found = json.loads(run("path", "--from", "act_cs_view_dashboard",
-                           "--to", "act_cs_create_credential").stdout)
+    found = json.loads(
+        run("path", "--from", "act_cs_view_dashboard", "--to", "act_cs_create_credential").stdout
+    )
     assert found["found"] is True
     assert found["path"][0] == "act_cs_view_dashboard"
-    missing = json.loads(run("path", "--from", "act_cs_view_dashboard",
-                             "--to", "act_pt_submit_withdrawal").stdout)
+    missing = json.loads(
+        run("path", "--from", "act_cs_view_dashboard", "--to", "act_pt_submit_withdrawal").stdout
+    )
     assert missing["found"] is False
 
 
@@ -232,14 +237,15 @@ def test_script_all_output_formats():
 def test_script_human_annotates_capability_and_teardown():
     result = run("script", "--flow", "create_project_with_credential", "--format", "human")
     assert result.exit_code == 0
-    assert "minted by capability 'totp'" in result.stdout   # mfa_code, not asked of human
+    assert "minted by capability 'totp'" in result.stdout  # mfa_code, not asked of human
     assert "password = {{password}}  (required — you must supply)" in result.stdout
     assert "Teardown (cleanup afterwards):" in result.stdout
 
 
 def test_script_json_surfaces_param_capabilities_and_teardown():
-    data = json.loads(run("script", "--flow", "create_project_with_credential",
-                          "--format", "json").stdout)
+    data = json.loads(
+        run("script", "--flow", "create_project_with_credential", "--format", "json").stdout
+    )
     assert data["param_capabilities"] == {"mfa_code": "totp"}
     td = data["teardown"]
     assert td[0]["id"] == "api_delete_project"
@@ -249,22 +255,44 @@ def test_script_json_surfaces_param_capabilities_and_teardown():
 
 
 def test_script_from_path_and_actions_and_set():
-    by_path = run("script", "--from", "act_cs_open_projects",
-                  "--to", "act_cs_create_project", "--format", "json")
+    by_path = run(
+        "script",
+        "--from",
+        "act_cs_open_projects",
+        "--to",
+        "act_cs_create_project",
+        "--format",
+        "json",
+    )
     assert by_path.exit_code == 0
-    by_actions = run("script", "--actions", "act_cs_open_projects,act_cs_create_project",
-                     "--format", "json")
+    by_actions = run(
+        "script", "--actions", "act_cs_open_projects,act_cs_create_project", "--format", "json"
+    )
     assert by_actions.exit_code == 0
-    with_set = run("script", "--flow", "create_project_with_credential",
-                   "--set", "project_name=my-proj", "--format", "json")
+    with_set = run(
+        "script",
+        "--flow",
+        "create_project_with_credential",
+        "--set",
+        "project_name=my-proj",
+        "--format",
+        "json",
+    )
     assert '"my-proj"' in with_set.stdout
 
 
 def test_script_params_file(tmp_path):
     pf = tmp_path / "params.json"
     pf.write_text(json.dumps({"project_name": "from-file"}))
-    result = run("script", "--flow", "create_project_with_credential",
-                 "--params", str(pf), "--format", "json")
+    result = run(
+        "script",
+        "--flow",
+        "create_project_with_credential",
+        "--params",
+        str(pf),
+        "--format",
+        "json",
+    )
     assert result.exit_code == 0
     assert "from-file" in result.stdout
 
@@ -283,8 +311,9 @@ def test_script_unknown_flow_exits_2():
 
 
 def test_script_refuse_destructive_and_batch():
-    refused = run("script", "--flow", "portal_withdrawal_via_ui",
-                  "--refuse-destructive", "--format", "json")
+    refused = run(
+        "script", "--flow", "portal_withdrawal_via_ui", "--refuse-destructive", "--format", "json"
+    )
     assert refused.exit_code == 0
     assert "refused" in json.loads(refused.stdout)
     batched = run("script", "--flow", "portal_withdrawal_via_ui", "--batch", "--format", "json")
@@ -292,9 +321,18 @@ def test_script_refuse_destructive_and_batch():
 
 
 def test_script_skip_auth_drops_auth_precondition():
-    data = json.loads(run("script", "--from", "act_cs_open_projects",
-                          "--to", "act_cs_create_project", "--skip-auth",
-                          "--format", "json").stdout)
+    data = json.loads(
+        run(
+            "script",
+            "--from",
+            "act_cs_open_projects",
+            "--to",
+            "act_cs_create_project",
+            "--skip-auth",
+            "--format",
+            "json",
+        ).stdout
+    )
     assert all(p["kind"] != "auth" for p in data["preconditions"])
 
 
@@ -320,6 +358,7 @@ def test_validate_table_format():
 
 def test_validate_broken_pack_exits_1(tmp_path):
     import shutil
+
     shutil.copytree(DEMO, tmp_path, dirs_exist_ok=True)
     p = tmp_path / "data" / "console.app.yaml"
     doc = yaml.safe_load(p.read_text())
@@ -347,8 +386,9 @@ def test_verify_by_flow_app_action():
 def test_verify_drive_and_allow_gated():
     drive = json.loads(run("verify", "--flow", "portal_withdrawal_via_ui", "--drive").stdout)
     assert drive["mode"] == "drive" and drive["refused_gated"]
-    allowed = json.loads(run("verify", "--flow", "portal_withdrawal_via_ui",
-                             "--drive", "--allow-gated").stdout)
+    allowed = json.loads(
+        run("verify", "--flow", "portal_withdrawal_via_ui", "--drive", "--allow-gated").stdout
+    )
     assert allowed["refused_gated"] == []
 
 
@@ -449,9 +489,10 @@ def test_bad_pack_dir_exits_2(tmp_path):
     assert result.exit_code == 2
 
 
-def test_cwd_pack_autodetected(tmp_path, monkeypatch):
+def test_dotuipilot_pack_autodetected(tmp_path, monkeypatch):
     import shutil
-    shutil.copytree(DEMO, tmp_path, dirs_exist_ok=True)
+
+    shutil.copytree(DEMO, tmp_path / ".uipilot", dirs_exist_ok=True)
     monkeypatch.delenv("UIPILOT_PACK", raising=False)
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["apps"])

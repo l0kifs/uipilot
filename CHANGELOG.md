@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-08
+
+### Changed
+
+- **`uipilot init` now scaffolds the pack under `.uipilot/`** (e.g.
+  `.uipilot/flowmap.config.yaml`, `.uipilot/data/`, `.uipilot/capabilities.py`)
+  instead of the project root. Agent instruction files (`.claude/skills/uipilot/`,
+  `AGENTS.md`) are still written at the project root.
+- **Pack auto-discovery** now resolves a `.uipilot/` pack in the cwd:
+  `$UIPILOT_PACK` → `<cwd>/.uipilot/` → the bundled example. The previous
+  root-of-cwd `flowmap.config.yaml` fallback has been removed; pass `--pack` or
+  set `$UIPILOT_PACK` to use a pack elsewhere.
+
+### Fixed
+
+- Applied `ruff format` across the codebase and added a `vulture_whitelist.py`
+  per-file lint ignore so the full quality-check suite (ruff, ty, vulture,
+  pytest coverage) passes cleanly.
+
 ## [0.1.0] - 2026-07-08
 
 Initial release.
@@ -34,5 +53,6 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/l0kifs/uipilot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/l0kifs/uipilot/releases/tag/v0.1.0

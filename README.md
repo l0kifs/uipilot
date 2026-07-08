@@ -28,17 +28,18 @@ cd your-project
 uipilot init                     # scaffold a pack + agent instructions here
 ```
 
-`uipilot init` writes a minimal, valid pack skeleton (`flowmap.config.yaml`,
-`data/`, `capabilities.py`) plus an agent instruction file — a Claude Code skill
+`uipilot init` writes a minimal, valid pack skeleton under `.uipilot/`
+(`.uipilot/flowmap.config.yaml`, `.uipilot/data/`, `.uipilot/capabilities.py`)
+plus an agent instruction file at the project root — a Claude Code skill
 (`.claude/skills/uipilot/SKILL.md`) and/or an `AGENTS.md` section (`--agent
 claude|agents`, repeatable). Then just **ask your agent to run a flow**: it
 explores the app, fills the pack, and drives it for you. Re-running `init`
 refreshes the skill but never clobbers a pack you've started (use `--force` to
 overwrite).
 
-Because `init` scaffolds into the cwd, every later `uipilot …` call finds the
-pack with **no `--pack` flag** (resolution order: `$UIPILOT_PACK` → a
-`flowmap.config.yaml` in the cwd → the bundled `examples/demo` pack).
+Because `init` scaffolds a `.uipilot/` pack in the cwd, every later `uipilot …`
+call finds it with **no `--pack` flag** (resolution order: `$UIPILOT_PACK` → a
+`.uipilot/` pack in the cwd → the bundled `examples/demo` pack).
 
 ### From source
 
@@ -79,7 +80,7 @@ uipilot --pack examples/demo verify --flow create_project_with_credential
 ## Pack layout
 
 ```
-your_pack/
+.uipilot/                     # the pack dir (scaffolded by `uipilot init`)
 ├── flowmap.config.yaml       # binds apps, tokens, risk taxonomy, capabilities
 ├── capabilities.py           # (optional) named auth adapters the engine calls by key
 └── data/

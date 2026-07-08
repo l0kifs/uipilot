@@ -29,8 +29,10 @@ def _synthetic_script():
         crosses_app=False,
         params={"x": "1"},
         params_required=["x"],
-        preconditions=[{"kind": "auth", "flow": "sign_in"},
-                       {"kind": "api_action", "id": "api_seed"}],
+        preconditions=[
+            {"kind": "auth", "flow": "sign_in"},
+            {"kind": "api_action", "id": "api_seed"},
+        ],
         steps=[
             _step("navigate", value="https://example.test/go"),
             _step("snapshot"),
@@ -80,13 +82,13 @@ def test_to_pw_test_covers_all_ops():
     assert ".fill('secret')" in spec
     assert ".selectOption('opt-a')" in spec
     assert "page.keyboard.press('Enter')" in spec
-    assert "getByText('Done')" in spec          # wait_for with text
-    assert "// wait_for" in spec                 # wait_for without text
-    assert "toBeVisible()" in spec               # expect
+    assert "getByText('Done')" in spec  # wait_for with text
+    assert "// wait_for" in spec  # wait_for without text
+    assert "toBeVisible()" in spec  # expect
     assert "// capture proj.id from url" in spec
     assert "setInputFiles('/tmp/f.png')" in spec
     assert "// fill_form" in spec
-    assert "// bogus_op" in spec                 # default branch
+    assert "// bogus_op" in spec  # default branch
     assert "precondition: auth sign_in" in spec
     assert "crosscheck: api_assert" in spec
 
@@ -123,7 +125,7 @@ def test_to_human_covers_all_ops():
     assert "upload /tmp/f.png" in text
     assert "fill several fields" not in text  # fill_form carries a note
     assert "batched 2 field fills" in text
-    assert "bogus_op" in text                 # default branch
+    assert "bogus_op" in text  # default branch
     assert "Cross-checks" in text and "Teardown" in text
 
 
@@ -153,15 +155,17 @@ def test_selector_from_dict_infers_strategy():
 
 
 def test_py_locator_all_strategies():
-    assert renderers._py_locator(
-        Selector(strategy="role", role="button", name="Go", exact=True)
-    ) == 'get_by_role("button", name="Go", exact=True)'
+    assert (
+        renderers._py_locator(Selector(strategy="role", role="button", name="Go", exact=True))
+        == 'get_by_role("button", name="Go", exact=True)'
+    )
     assert renderers._py_locator(Selector(strategy="label", label="Pw")) == 'get_by_label("Pw")'
     assert renderers._py_locator(Selector(strategy="text", text="Hi")) == 'get_by_text("Hi")'
     assert renderers._py_locator(Selector(strategy="testid", testid="t")) == 'get_by_test_id("t")'
     assert renderers._py_locator(Selector(strategy="css", css=".x")) == 'locator(".x")'
-    scoped = renderers._py_locator(Selector(strategy="role", role="button",
-                                            name="Create", scope="dialog"))
+    scoped = renderers._py_locator(
+        Selector(strategy="role", role="button", name="Create", scope="dialog")
+    )
     assert scoped.startswith('get_by_role("dialog").')
 
 

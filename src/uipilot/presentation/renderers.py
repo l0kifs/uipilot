@@ -56,8 +56,11 @@ def to_human(script: CompiledScript) -> str:
             note = ""
             if key in script.params_required:
                 cap = script.param_capabilities.get(key)
-                note = (f"  (required — minted by capability '{cap}')" if cap
-                        else "  (required — you must supply)")
+                note = (
+                    f"  (required — minted by capability '{cap}')"
+                    if cap
+                    else "  (required — you must supply)"
+                )
             L.append(f"  {key} = {val}{note}")
 
     if script.preconditions:
@@ -65,8 +68,10 @@ def to_human(script: CompiledScript) -> str:
         L.append("Preconditions (run first):")
         for i, pre in enumerate(script.preconditions, 1):
             if pre.get("kind") == "auth":
-                L.append(f"  {i}. sign in — reuse session "
-                         f"'{pre.get('storage_state_key')}' or run flow '{pre.get('flow')}'")
+                L.append(
+                    f"  {i}. sign in — reuse session "
+                    f"'{pre.get('storage_state_key')}' or run flow '{pre.get('flow')}'"
+                )
             else:
                 L.append(f"  {i}. provision via API — {pre.get('call')}")
 
@@ -103,7 +108,7 @@ def _human_step(step) -> str:
     if op in ("fill", "type"):
         return f'fill {desc} with "{step.value}"'
     if op == "select":
-        return f"select \"{step.value}\" in {desc}"
+        return f'select "{step.value}" in {desc}'
     if op == "press":
         return f"press {step.value or args.get('key', '')}"
     if op == "wait_for":
@@ -131,11 +136,14 @@ def to_steps(script: CompiledScript) -> str:
         if step.capture:
             row["capture"] = step.capture
         rows.append(row)
-    return json.dumps({
-        "flow": script.name,
-        "preconditions": script.preconditions,
-        "steps": rows,
-    }, indent=2)
+    return json.dumps(
+        {
+            "flow": script.name,
+            "preconditions": script.preconditions,
+            "steps": rows,
+        },
+        indent=2,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -158,10 +166,17 @@ def _selector_from_dict(raw: dict) -> Selector:
             strategy = "testid"
         else:
             strategy = "css"
-    return Selector(strategy=strategy, role=raw.get("role"), name=raw.get("name"),
-                    text=raw.get("text"), label=raw.get("label"), css=raw.get("css"),
-                    testid=raw.get("testid"), scope=raw.get("scope"),
-                    exact=raw.get("exact"))
+    return Selector(
+        strategy=strategy,
+        role=raw.get("role"),
+        name=raw.get("name"),
+        text=raw.get("text"),
+        label=raw.get("label"),
+        css=raw.get("css"),
+        testid=raw.get("testid"),
+        scope=raw.get("scope"),
+        exact=raw.get("exact"),
+    )
 
 
 def _py_locator(sel: Selector) -> str:
@@ -172,17 +187,17 @@ def _py_locator(sel: Selector) -> str:
         extra = f", name={_q(sel.name)}" if sel.name else ""
         if sel.exact:
             extra += ", exact=True"
-        base = f'get_by_role({_q(sel.role or "")}{extra})'
+        base = f"get_by_role({_q(sel.role or '')}{extra})"
     elif sel.strategy == "label":
-        base = f'get_by_label({_q(sel.label or sel.name or "")})'
+        base = f"get_by_label({_q(sel.label or sel.name or '')})"
     elif sel.strategy == "text":
-        base = f'get_by_text({_q(sel.text or sel.name or "")})'
+        base = f"get_by_text({_q(sel.text or sel.name or '')})"
     elif sel.strategy == "testid":
-        base = f'get_by_test_id({_q(sel.testid or "")})'
+        base = f"get_by_test_id({_q(sel.testid or '')})"
     else:
-        base = f'locator({_q(sel.css or "")})'
+        base = f"locator({_q(sel.css or '')})"
     if sel.scope:
-        return f'get_by_role({_q(sel.scope)}).{base}'
+        return f"get_by_role({_q(sel.scope)}).{base}"
     return base
 
 
@@ -200,7 +215,9 @@ def to_pw_test(script: CompiledScript) -> str:
         f"  risk_max: {script.risk_max}",
     ]
     for pre in script.preconditions:
-        lines.append(f"//   precondition: {pre.get('kind')} {pre.get('id') or pre.get('flow') or ''}")
+        lines.append(
+            f"//   precondition: {pre.get('kind')} {pre.get('id') or pre.get('flow') or ''}"
+        )
     lines.append("")
     lines.append(f"test({_js(script.name)}, async ({{ page }}) => {{")
     for step in script.steps:
@@ -306,6 +323,6 @@ def _element_method(el: Element, id_prefix: str) -> str:
     name = el.id
     for pref in (f"{id_prefix}_", f"{el.app}_"):
         if name.startswith(pref):
-            name = name[len(pref):]
+            name = name[len(pref) :]
             break
     return name or el.id

@@ -117,7 +117,7 @@ def test_risk_taxonomy_rank_and_max():
     rt = RiskTaxonomy(levels=["low", "high"], gated=["high"])
     assert rt.rank("low") == 0 and rt.rank("unknown") == -1
     assert rt.max(["low", "high"]) == "high"
-    assert rt.max(["unknown"]) == "unknown"   # nothing in taxonomy → first
+    assert rt.max(["unknown"]) == "unknown"  # nothing in taxonomy → first
     assert rt.max([]) is None
 
 
@@ -148,17 +148,21 @@ def test_runtime_base_url_env_and_default():
 
 
 def test_runtime_token_counter_and_env_and_unknown():
-    cfg = Config(pack="p", apps=[], tokens={
-        "seq": Token("seq", "counter"),
-        "prefix": Token("prefix", "env", name="P", default="fallback"),
-        "weird": Token("weird", "somethingelse", default="dv"),
-    })
+    cfg = Config(
+        pack="p",
+        apps=[],
+        tokens={
+            "seq": Token("seq", "counter"),
+            "prefix": Token("prefix", "env", name="P", default="fallback"),
+            "weird": Token("weird", "somethingelse", default="dv"),
+        },
+    )
     ctx = RuntimeContext(cfg, env={})
-    assert ctx.token("prefix") == "fallback"        # env missing → default
-    assert ctx.token("seq") == "1"                  # counter start
-    assert ctx.token("seq") == "1"                  # cached, stable in a run
-    assert ctx.token("weird") == "dv"               # non-env/counter → default
-    assert ctx.token("unknown") is None             # absent token
+    assert ctx.token("prefix") == "fallback"  # env missing → default
+    assert ctx.token("seq") == "1"  # counter start
+    assert ctx.token("seq") == "1"  # cached, stable in a run
+    assert ctx.token("weird") == "dv"  # non-env/counter → default
+    assert ctx.token("unknown") is None  # absent token
 
 
 def test_iter_template_refs_and_resolve():

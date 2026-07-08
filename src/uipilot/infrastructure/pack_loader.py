@@ -45,6 +45,10 @@ CONFIG_FILENAME = "flowmap.config.yaml"
 DATA_DIR = "data"
 FLOWS_FILENAME = "flows.yaml"
 
+# Conventional pack location inside a project: `uipilot init` scaffolds here and
+# the CLI auto-discovers a pack in `<cwd>/.uipilot/` before falling back to cwd.
+PACK_SUBDIR = ".uipilot"
+
 
 # ---------------------------------------------------------------------------
 # YAML helpers
@@ -114,8 +118,18 @@ def _parse_param(raw: dict, *, where: str) -> Param:
     )
 
 
-_STEP_KNOWN = {"op", "element", "value", "wait_for", "scope", "optional",
-               "key", "from", "pattern", "path"}
+_STEP_KNOWN = {
+    "op",
+    "element",
+    "value",
+    "wait_for",
+    "scope",
+    "optional",
+    "key",
+    "from",
+    "pattern",
+    "path",
+}
 
 
 def _parse_step(raw: dict, *, where: str) -> Step:
@@ -220,10 +234,14 @@ def _parse_app_header(raw: dict) -> App:
         raise PackError("app header needs an 'id'")
     base = raw.get("base_url", {}) or {}
     auth_raw = raw.get("auth") or {}
-    auth = Auth(
-        entry_flow=auth_raw.get("entry_flow"),
-        storage_state_key=auth_raw.get("storage_state_key"),
-    ) if auth_raw else None
+    auth = (
+        Auth(
+            entry_flow=auth_raw.get("entry_flow"),
+            storage_state_key=auth_raw.get("storage_state_key"),
+        )
+        if auth_raw
+        else None
+    )
     return App(
         id=raw["id"],
         id_prefix=raw.get("id_prefix", raw["id"]),
@@ -297,9 +315,7 @@ def load_pack(pack_dir: str | Path) -> Pack:
             raise PackError(f"{app_path}: missing 'app:' header")
         app = _parse_app_header(header)
         if app.id != app_id:
-            raise PackError(
-                f"{app_path}: app id '{app.id}' does not match filename '{app_id}'"
-            )
+            raise PackError(f"{app_path}: app id '{app.id}' does not match filename '{app_id}'")
         apps[app_id] = app
 
         for eid, espec in (raw.get("elements", {}) or {}).items():

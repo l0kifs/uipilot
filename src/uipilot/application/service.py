@@ -49,9 +49,15 @@ def open_pack(path: str | Path, env: Optional[dict] = None) -> PackContext:
 # ---------------------------------------------------------------------------
 
 
-def filter_actions(pctx: PackContext, *, app: Optional[str] = None,
-                   section: Optional[str] = None, risk: Optional[str] = None,
-                   grep: Optional[str] = None, transport: Optional[str] = None) -> list[Action]:
+def filter_actions(
+    pctx: PackContext,
+    *,
+    app: Optional[str] = None,
+    section: Optional[str] = None,
+    risk: Optional[str] = None,
+    grep: Optional[str] = None,
+    transport: Optional[str] = None,
+) -> list[Action]:
     pack = pctx.pack
     out: list[Action] = []
     for a in pack.actions.values():
@@ -71,9 +77,14 @@ def filter_actions(pctx: PackContext, *, app: Optional[str] = None,
     return sorted(out, key=lambda a: a.id)
 
 
-def filter_elements(pctx: PackContext, *, app: Optional[str] = None,
-                    action: Optional[str] = None, section: Optional[str] = None,
-                    grep: Optional[str] = None) -> list[Element]:
+def filter_elements(
+    pctx: PackContext,
+    *,
+    app: Optional[str] = None,
+    action: Optional[str] = None,
+    section: Optional[str] = None,
+    grep: Optional[str] = None,
+) -> list[Element]:
     pack = pctx.pack
     scope_ids: Optional[set] = None
     if action:
@@ -166,9 +177,15 @@ def flow_param_manifest(pctx: PackContext, name: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def compile_script(pctx: PackContext, *, flow: Optional[str] = None,
-                   src: Optional[str] = None, dst: Optional[str] = None,
-                   actions: Optional[list[str]] = None, **compile_kw) -> CompiledScript:
+def compile_script(
+    pctx: PackContext,
+    *,
+    flow: Optional[str] = None,
+    src: Optional[str] = None,
+    dst: Optional[str] = None,
+    actions: Optional[list[str]] = None,
+    **compile_kw,
+) -> CompiledScript:
     """Compile a flow, a path (src→dst), or an explicit action list."""
     pack, rt = pctx.pack, pctx.runtime
     if flow:
@@ -184,11 +201,24 @@ def validate_pack(pctx: PackContext, app: Optional[str] = None) -> ValidationRep
     return validation.validate(pctx.pack, app=app)
 
 
-def verify(pctx: PackContext, *, flow: Optional[str] = None, app: Optional[str] = None,
-           action: Optional[str] = None, drive: bool = False,
-           allow_gated: bool = False) -> dict:
-    return verification.verify_probe(pctx.pack, pctx.runtime, flow=flow, app=app,
-                                     action=action, drive=drive, allow_gated=allow_gated)
+def verify(
+    pctx: PackContext,
+    *,
+    flow: Optional[str] = None,
+    app: Optional[str] = None,
+    action: Optional[str] = None,
+    drive: bool = False,
+    allow_gated: bool = False,
+) -> dict:
+    return verification.verify_probe(
+        pctx.pack,
+        pctx.runtime,
+        flow=flow,
+        app=app,
+        action=action,
+        drive=drive,
+        allow_gated=allow_gated,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -199,8 +229,10 @@ def verify(pctx: PackContext, *, flow: Optional[str] = None, app: Optional[str] 
 def list_capabilities(pctx: PackContext, check: bool = False) -> list[dict]:
     reg = CapabilityRegistry(pctx.pack.config, pctx.pack.root)
     checks = reg.check_all() if check else {}
-    return [{"key": key, "impl": reg.spec(key),
-             "error": checks.get(key) if check else None} for key in reg.keys]
+    return [
+        {"key": key, "impl": reg.spec(key), "error": checks.get(key) if check else None}
+        for key in reg.keys
+    ]
 
 
 def init_project(dest: str | Path, agents: list[str], force: bool = False) -> dict:
