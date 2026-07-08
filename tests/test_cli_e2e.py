@@ -178,6 +178,18 @@ def test_flow_detail_and_missing():
     assert run("flow", "nope").exit_code == 2
 
 
+def test_flow_params_manifest_aggregates_and_marks_secrets():
+    data = json.loads(run("flow", "create_project_with_credential", "--params").stdout)
+    keys = {p["key"] for p in data["params"]}
+    # flow-level params AND every action's params, deduped into one manifest
+    assert {"project_name", "cred_name", "email", "password", "mfa_code"} <= keys
+    assert data["required"] == ["email", "password", "mfa_code"]
+    mfa = next(p for p in data["params"] if p["key"] == "mfa_code")
+    assert mfa["secret"] is True
+    assert mfa["satisfied_by"] == "totp"
+    assert mfa["default"] is None            # secret default never echoed
+
+
 # ---------------------------------------------------------------------------
 # path
 # ---------------------------------------------------------------------------
@@ -210,10 +222,30 @@ def test_script_all_output_formats():
         ("json", '"flow"'),
         ("pw-test", "@playwright/test"),
         ("playwright-mcp", '"mcp"'),
+        ("human", "Flow: create_project_with_credential"),
     ]:
         result = run("script", "--flow", "create_project_with_credential", "--format", fmt)
         assert result.exit_code == 0, (fmt, result.output)
         assert needle in result.stdout
+
+
+def test_script_human_annotates_capability_and_teardown():
+    result = run("script", "--flow", "create_project_with_credential", "--format", "human")
+    assert result.exit_code == 0
+    assert "minted by capability 'totp'" in result.stdout   # mfa_code, not asked of human
+    assert "password = {{password}}  (required — you must supply)" in result.stdout
+    assert "Teardown (cleanup afterwards):" in result.stdout
+
+
+def test_script_json_surfaces_param_capabilities_and_teardown():
+    data = json.loads(run("script", "--flow", "create_project_with_credential",
+                          "--format", "json").stdout)
+    assert data["param_capabilities"] == {"mfa_code": "totp"}
+    td = data["teardown"]
+    assert td[0]["id"] == "api_delete_project"
+    assert td[0]["args"]["project_id"] == "{{captured.project_id}}"
+    # teardown's captured arg does not leak into the flow's param echo
+    assert "project_id" not in data["params"]
 
 
 def test_script_from_path_and_actions_and_set():

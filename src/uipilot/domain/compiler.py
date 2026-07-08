@@ -73,7 +73,10 @@ class CompiledScript:
     steps: list[CompiledStep]
     crosschecks: list[dict] = field(default_factory=list)
     refused: Optional[str] = None
-    teardown: Optional[dict] = None
+    teardown: list[dict] = field(default_factory=list)
+    # {param_key: capability_key} for required params a capability can mint —
+    # the agent resolves these itself instead of prompting a human.
+    param_capabilities: dict = field(default_factory=dict)
 
     def as_dict(self, *, with_mcp: bool = True) -> dict:
         out: dict = {
@@ -87,6 +90,8 @@ class CompiledScript:
             out["refused"] = self.refused
         out["params"] = self.params
         out["params_required"] = self.params_required
+        if self.param_capabilities:
+            out["param_capabilities"] = self.param_capabilities
         out["preconditions"] = self.preconditions
         out["steps"] = [s.as_dict(with_mcp=with_mcp) for s in self.steps]
         if self.crosschecks:
@@ -114,7 +119,15 @@ class _Compiler:
         self.refuse_destructive = refuse_destructive
         self.params_echo: dict[str, str] = {}
         self.params_required: list[str] = []
+        self.param_capabilities: dict[str, str] = {}
         self._produced_captures: set[str] = set()
+
+    def _note_required(self, param) -> None:
+        """Record a missing required param and any capability that can mint it."""
+        if param.key not in self.params_required:
+            self.params_required.append(param.key)
+        if param.satisfied_by:
+            self.param_capabilities[param.key] = param.satisfied_by
 
     # -- param resolution ---------------------------------------------------
 
@@ -157,8 +170,8 @@ class _Compiler:
             # Record echo/required once (first occurrence wins for the header).
             if param.key not in self.params_echo:
                 self.params_echo[param.key] = echo
-                if missing and param.key not in self.params_required:
-                    self.params_required.append(param.key)
+                if missing:
+                    self._note_required(param)
         return pmap
 
     def _register_flow_params(self, flow_params, flow_defaults):
@@ -166,8 +179,8 @@ class _Compiler:
             echo, _step, missing = self._resolve_param(param, {}, flow_defaults)
             if param.key not in self.params_echo:
                 self.params_echo[param.key] = echo
-                if missing and param.key not in self.params_required:
-                    self.params_required.append(param.key)
+                if missing:
+                    self._note_required(param)
 
     # -- step emission ------------------------------------------------------
 
@@ -206,7 +219,8 @@ class _Compiler:
 
     def compile(self, invocations: list[Invocation], *, name: str,
                 flow_params=None, flow_defaults=None,
-                primary_app: Optional[str] = None) -> CompiledScript:
+                primary_app: Optional[str] = None,
+                teardown_invs: Optional[list[Invocation]] = None) -> CompiledScript:
         flow_params = flow_params or []
         flow_defaults = flow_defaults or {p.key: p.default for p in flow_params}
         self._register_flow_params(flow_params, flow_defaults)
@@ -272,6 +286,9 @@ class _Compiler:
             for i, step in enumerate(steps, start=1):
                 step.n = i
 
+        # Teardown: API actions that delete what the flow created (test hygiene).
+        teardown = self._teardown_entries(teardown_invs, flow_defaults)
+
         risk_max = self.pack.config.risk.max(risks) if risks else None
         crosses_app = len(apps_seen) > 1
 
@@ -287,7 +304,33 @@ class _Compiler:
             steps=steps,
             crosschecks=crosschecks,
             refused=refused,
+            teardown=teardown,
+            param_capabilities=dict(self.param_capabilities),
         )
+
+    def _teardown_entries(self, teardown_invs, flow_defaults) -> list[dict]:
+        """Compile teardown invocations into agent-run API delete entries.
+
+        Teardown args (usually ``{{captured.*}}`` from the flow) are resolved
+        without registering into the flow's ``params`` echo / ``params_required``:
+        they are cleanup plumbing, not values the caller supplies.
+        """
+        entries: list[dict] = []
+        for inv in teardown_invs or []:
+            action = self.pack.action(inv.action_id)
+            if action is None or not action.is_api:
+                continue
+            args = {p.key: self._resolve_param(p, inv.params, flow_defaults or {})[1]
+                    for p in action.params}
+            entries.append({
+                "kind": "api_action",
+                "id": action.id,
+                "call": action.call,
+                "args": args,
+                "risk": action.risk,
+                "run_by": "agent",
+            })
+        return entries
 
     def _resolve_args(self, action: Action, pmap: dict) -> dict:
         args = {}
@@ -454,9 +497,12 @@ def compile_flow(pack: Pack, ctx: RuntimeContext, flow_id: str, **kw) -> Compile
         raise KeyError(f"no flow named '{flow_id}'")
     invs = expand_invocations(pack, flow_id)
     flow_defaults = {p.key: p.default for p in flow.params}
+    teardown_invs = [Invocation(ps.action, ps.alias, dict(ps.params), ps.role)
+                     for ps in flow.teardown if ps.action]
     comp = _Compiler(pack, ctx, **kw)
     return comp.compile(invs, name=flow_id, flow_params=flow.params,
-                        flow_defaults=flow_defaults, primary_app=flow.app)
+                        flow_defaults=flow_defaults, primary_app=flow.app,
+                        teardown_invs=teardown_invs)
 
 
 def compile_actions(pack: Pack, ctx: RuntimeContext, action_ids: list[str],

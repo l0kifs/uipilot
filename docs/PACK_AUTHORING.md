@@ -69,7 +69,7 @@ actions:
 | `Element` | `id`, `type`, `section?`, `selector{strategy, role, name, text, label, css, testid, scope, exact}`, `purpose?` |
 | `Action` (ui) | `transport: ui` (default), `purpose`, `route`, `risk`, `elements[]`, `prev[]`, `next[]`, `params[]`, `steps[]`, `captures[]`, `requires[]?`, `provides[]?` |
 | `Action` (api) | `transport: api`, `role` (`setup`\|`crosscheck`), `purpose`, `risk`, `call`, `params[]`, `captures[]`, `requires[]?`, `provides[]?` — **no** `route`/`elements`/`steps`/`prev`/`next` |
-| `Param` | `key`, `type` (`string`\|`enum`\|`secret`\|`address`\|`amount`\|`int`), `required`, `default`, `enum[]` |
+| `Param` | `key`, `type` (`string`\|`enum`\|`secret`\|`address`\|`amount`\|`int`), `required`, `default`, `enum[]`, `satisfied_by?` (capability key that can mint the value — e.g. a `secret` `mfa_code` with `satisfied_by: totp`, so the agent resolves it instead of asking a human) |
 | `Step` | `op`, `element?`, `value?`, `wait_for?`, `scope?`, `optional?` |
 | `Capture` | `key`, `from` (`url`\|`element`\|`clipboard`\|`response`), `pattern?`, `path?`, `element?` |
 
@@ -96,6 +96,8 @@ subflow), or `{ action: <id>, as?: <alias>, params?: {…} }` (aliased invocatio
 ```yaml
 actions:                          # API actions can live here, shared across flows
   api_create: { transport: api, role: setup, app: console, call: "factories.x:create", ... }
+  api_delete: { transport: api, role: setup, app: console, call: "factories.x:delete",
+                params: [ { key: id, type: string, required: true } ] }
 
 flows:
   sign_in:                        # L2 subflow, authored once
@@ -109,7 +111,13 @@ flows:
       - use: sign_in
       - { action: act_cs_create, as: primary,   params: { name: "{{prefix}}-a" } }  # L3
       - { action: act_cs_create, as: secondary, params: { name: "{{prefix}}-b" } }
+    teardown:                     # API deletes run after the flow (even on failure)
+      - { action: api_delete, params: { id: "{{captured.id}}" } }
 ```
+
+A flow's optional `teardown:` is a list of API actions the agent runs after the
+flow (and after any crosschecks) to delete what it created — keyed by the flow's
+`{{captured.*}}` values. It keeps repeated/CI runs from leaving orphan test data.
 
 Captures bridge transports: an API action's `from: response` capture flows into
 a later UI step as `{{alias.key}}` exactly like a UI `from: url` capture.

@@ -128,6 +128,9 @@ class Param:
     required: bool = False
     default: Optional[str] = None
     enum: list[str] = field(default_factory=list)
+    # Capability key that can mint this value (e.g. a `secret` mfa_code that a
+    # `totp` adapter supplies), so the agent need not ask a human for it.
+    satisfied_by: Optional[str] = None
 
     @property
     def is_secret(self) -> bool:
@@ -271,6 +274,8 @@ class Flow:
     path: list[PathStep] = field(default_factory=list)
     params: list[Param] = field(default_factory=list)
     guard: Optional[dict] = None  # cheap expect/wait_for that short-circuits (L4)
+    # API actions run after the flow to delete what it created (test hygiene).
+    teardown: list[PathStep] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

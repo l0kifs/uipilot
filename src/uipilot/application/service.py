@@ -19,6 +19,7 @@ from typing import Optional
 
 from uipilot.domain import compiler, graph, usage, validation, verification
 from uipilot.domain.compiler import CompiledScript
+from uipilot.domain.flows import expand_invocations
 from uipilot.domain.model import Action, Element, Pack
 from uipilot.domain.templating import RuntimeContext
 from uipilot.domain.validation import ValidationReport
@@ -114,6 +115,49 @@ def route(pctx: PackContext, src: str, dst: str, max_depth: int = 25) -> dict:
 
 def uses(pctx: PackContext, ref: str) -> dict:
     return usage.uses(pctx.pack, ref)
+
+
+def flow_param_manifest(pctx: PackContext, name: str) -> list[dict]:
+    """Aggregate every param a flow needs (flow-level + each action's), deduped.
+
+    A cheap lookup that answers "what must I supply?" without compiling — so the
+    caller can gather values in one pass instead of the compile-read-recompile
+    dance. Secrets never echo a default; ``satisfied_by`` names a capability that
+    can mint the value so the agent need not ask a human.
+    """
+    pack = pctx.pack
+    flow = pack.flow(name)
+    if flow is None:
+        raise KeyError(f"no flow named '{name}'")
+    seen: set[str] = set()
+    manifest: list[dict] = []
+
+    def _add(param) -> None:
+        if param.key in seen:
+            return
+        seen.add(param.key)
+        entry = {
+            "key": param.key,
+            "type": param.type,
+            "required": param.required,
+            "secret": param.is_secret,
+            "default": None if param.is_secret else param.default,
+        }
+        if param.enum:
+            entry["enum"] = list(param.enum)
+        if param.satisfied_by:
+            entry["satisfied_by"] = param.satisfied_by
+        manifest.append(entry)
+
+    for param in flow.params:
+        _add(param)
+    for inv in expand_invocations(pack, name):
+        action = pack.action(inv.action_id)
+        if action is None:
+            continue
+        for param in action.params:
+            _add(param)
+    return manifest
 
 
 # ---------------------------------------------------------------------------

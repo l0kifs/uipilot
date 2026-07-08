@@ -100,7 +100,7 @@ field reference and porting checklist.
 | `elements` | List/filter elements + resolved selectors |
 | `show action <id>` / `show element <id>` | Full detail, selectors resolved inline |
 | `uses <id>` | Reverse index — change blast radius before you edit |
-| `flows` / `flow <name>` | List / show named flows |
+| `flows` / `flow <name> [--params]` | List / show named flows (`--params`: aggregated param manifest only) |
 | `path --from <a> --to <b>` | BFS a route through the flow graph |
 | `script …` | **Emit an executable Playwright-MCP script** (see below) |
 | `validate` | Lint the model statically (CI gate) |
@@ -115,8 +115,11 @@ field reference and porting checklist.
 uipilot script (--flow <name> | --from <a> --to <b> | --actions a,b,c)
                [--params file.json] [--set key=value ...]
                [--skip-auth] [--batch] [--refuse-destructive]
-               [--format playwright-mcp|steps|json|pw-test]
+               [--format playwright-mcp|steps|json|pw-test|human]
 ```
+
+* **`--format human`** emits a plain-English preview (numbered steps, params,
+  risk, teardown) for a person to review before an agent runs a risky flow.
 
 * **Param resolution:** `--set` > `--params` > model defaults. Defaults expand
   pack tokens (`{{prefix}}`, `{{seq}}`). Unresolved **required** params are

@@ -31,6 +31,95 @@ def to_playwright_mcp(script: CompiledScript) -> str:
     return json.dumps(script.as_dict(with_mcp=True), indent=2)
 
 
+def to_human(script: CompiledScript) -> str:
+    """A plain-English preview of a compiled flow, for a human to review before
+    an agent runs it — especially useful before approving a gated (destructive /
+    money-moving) flow. Emits no MCP/JSON, just numbered prose."""
+    L: list[str] = []
+    L.append(f"Flow: {script.name}  (app: {script.app})")
+    facts = [f"risk: {script.risk_max or 'none'}"]
+    if script.requires_auth:
+        facts.append(f"requires auth: {', '.join(script.requires_auth)}")
+    if script.crosses_app:
+        facts.append("crosses app: yes")
+    L.append("  " + " · ".join(facts))
+
+    if script.refused:
+        L.append("")
+        L.append(f"⚠ REFUSED: {script.refused}")
+        return "\n".join(L)
+
+    if script.params:
+        L.append("")
+        L.append("Params:")
+        for key, val in script.params.items():
+            note = ""
+            if key in script.params_required:
+                cap = script.param_capabilities.get(key)
+                note = (f"  (required — minted by capability '{cap}')" if cap
+                        else "  (required — you must supply)")
+            L.append(f"  {key} = {val}{note}")
+
+    if script.preconditions:
+        L.append("")
+        L.append("Preconditions (run first):")
+        for i, pre in enumerate(script.preconditions, 1):
+            if pre.get("kind") == "auth":
+                L.append(f"  {i}. sign in — reuse session "
+                         f"'{pre.get('storage_state_key')}' or run flow '{pre.get('flow')}'")
+            else:
+                L.append(f"  {i}. provision via API — {pre.get('call')}")
+
+    L.append("")
+    L.append("Steps:")
+    for step in script.steps:
+        L.append(f"  {step.n}. {_human_step(step)}")
+
+    if script.crosschecks:
+        L.append("")
+        L.append("Cross-checks (assert backend afterwards):")
+        for cc in script.crosschecks:
+            L.append(f"  - {cc.get('id')} → {cc.get('call')}")
+
+    if script.teardown:
+        L.append("")
+        L.append("Teardown (cleanup afterwards):")
+        for td in script.teardown:
+            L.append(f"  - {td.get('id')} → {td.get('call')}")
+
+    return "\n".join(L)
+
+
+def _human_step(step) -> str:
+    args = (step.mcp or {}).get("args", {})
+    desc = args.get("element") or step.element or ""
+    op = step.op
+    if op == "navigate":
+        return f"go to {step.value or args.get('url', '')}"
+    if op == "snapshot":
+        return "take a page snapshot"
+    if op == "click":
+        return f"click {desc}"
+    if op in ("fill", "type"):
+        return f'fill {desc} with "{step.value}"'
+    if op == "select":
+        return f"select \"{step.value}\" in {desc}"
+    if op == "press":
+        return f"press {step.value or args.get('key', '')}"
+    if op == "wait_for":
+        target = args.get("text") or args.get("textGone") or desc or "the page to settle"
+        return f"wait for {target}"
+    if op == "expect":
+        return step.note or f"assert {desc} is present"
+    if op == "capture":
+        return f"capture {step.capture} from {step.from_}"
+    if op == "upload":
+        return f"upload {step.value}"
+    if op == "fill_form":
+        return step.note or "fill several fields"
+    return op
+
+
 def to_steps(script: CompiledScript) -> str:
     rows = []
     for step in script.steps:

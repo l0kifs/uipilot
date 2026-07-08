@@ -97,6 +97,49 @@ def test_to_pw_test_from_real_flow(pack, ctx):
     assert "getByRole('button', { name: 'Sign in' })" in spec
 
 
+# --- human preview ---------------------------------------------------------
+
+
+def test_to_human_covers_all_ops():
+    s = _synthetic_script()
+    s.param_capabilities = {"x": "totp"}
+    s.teardown = [{"id": "api_del", "call": "factories.x:delete"}]
+    text = renderers.to_human(s)
+    assert "Flow: synthetic  (app: demo)" in text
+    assert "risk: low" in text
+    assert "requires auth: demo" in text
+    # a required param a capability can mint is annotated, not asked of a human
+    assert "minted by capability 'totp'" in text
+    assert "sign in — reuse session" in text
+    assert "provision via API" in text
+    # every op renders a plain-English line
+    assert "go to https://example.test/go" in text
+    assert "take a page snapshot" in text
+    assert 'select "opt-a" in' in text
+    assert "press Enter" in text
+    assert "wait for Done" in text
+    assert "wait for the page to settle" in text  # wait_for with no target
+    assert "capture proj.id from url" in text
+    assert "upload /tmp/f.png" in text
+    assert "fill several fields" not in text  # fill_form carries a note
+    assert "batched 2 field fills" in text
+    assert "bogus_op" in text                 # default branch
+    assert "Cross-checks" in text and "Teardown" in text
+
+
+def test_to_human_required_param_without_capability():
+    text = renderers.to_human(_synthetic_script())
+    assert "required — you must supply" in text
+
+
+def test_to_human_refused_short_circuits():
+    s = _synthetic_script()
+    s.refused = "path carries gated risk ['money-moving']"
+    text = renderers.to_human(s)
+    assert "⚠ REFUSED" in text
+    assert "Steps:" not in text  # nothing executable is shown
+
+
 # --- selector-dict inference + python locator ------------------------------
 
 

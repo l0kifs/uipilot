@@ -318,13 +318,25 @@ def flows(ctx: typer.Context) -> None:
 
 
 @app.command()
-def flow(ctx: typer.Context, name: str) -> None:
+def flow(
+    ctx: typer.Context,
+    name: str,
+    params_only: bool = typer.Option(
+        False, "--params",
+        help="print only the aggregated param manifest (flow + every action)"),
+) -> None:
     """Show a named flow (action path + params)."""
     pctx = _load(ctx)
     f = pctx.pack.flow(name)
     if f is None:
         err_console.print(f"[red]no flow[/red] '{name}'")
         raise typer.Exit(2)
+    if params_only:
+        manifest = service.flow_param_manifest(pctx, name)
+        _emit(ctx, {"flow": name,
+                    "required": [p["key"] for p in manifest if p["required"]],
+                    "params": manifest})
+        return
     path = []
     for p in f.path:
         entry = {}
@@ -381,7 +393,7 @@ def script(
     batch: bool = typer.Option(False, "--batch"),
     refuse_destructive: bool = typer.Option(False, "--refuse-destructive"),
     fmt: str = typer.Option("playwright-mcp", "--format",
-                            help="playwright-mcp | steps | json | pw-test"),
+                            help="playwright-mcp | steps | json | pw-test | human"),
 ) -> None:
     """Emit an executable Playwright-MCP script for a flow / path / actions."""
     pctx = _load(ctx)
@@ -406,6 +418,8 @@ def script(
         print(renderers.to_json(compiled))
     elif fmt == "pw-test":
         print(renderers.to_pw_test(compiled))
+    elif fmt == "human":
+        print(renderers.to_human(compiled))
     else:
         print(renderers.to_playwright_mcp(compiled))
 

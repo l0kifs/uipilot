@@ -44,6 +44,15 @@ actions:
     call: "clients.operation:get"
     params: [ { key: operation_id, type: string, required: true } ]
 
+  api_delete_project:
+    transport: api
+    role: setup
+    app: console
+    purpose: "Delete a project by id (flow teardown — test hygiene)."
+    risk: low
+    call: "factories.project:delete_project"
+    params: [ { key: project_id, type: string, required: true } ]
+
 flows:
   # --- L2 subflows (authored once, embedded anywhere) ---
   console_sign_in:
@@ -76,6 +85,9 @@ flows:
     params:
       - { key: project_name, type: string, default: "{{prefix}}-project-{{seq}}" }
       - { key: cred_name,    type: string, default: "{{prefix}}-cred-{{seq}}" }
+    teardown:
+      # Delete the project the UI created, keyed by its captured id.
+      - { action: api_delete_project, params: { project_id: "{{captured.project_id}}" } }
 
   onboard_two_projects:
     app: console

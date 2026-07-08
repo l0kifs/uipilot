@@ -110,6 +110,7 @@ def _parse_param(raw: dict, *, where: str) -> Param:
         required=bool(raw.get("required", False)),
         default=raw.get("default"),
         enum=list(raw.get("enum", []) or []),
+        satisfied_by=raw.get("satisfied_by"),
     )
 
 
@@ -210,6 +211,7 @@ def _parse_flow(flow_id: str, raw: dict) -> Flow:
         path=[_parse_path_step(p, where=where) for p in raw.get("path", []) or []],
         params=[_parse_param(p, where=where) for p in raw.get("params", []) or []],
         guard=raw.get("guard"),
+        teardown=[_parse_path_step(p, where=where) for p in raw.get("teardown", []) or []],
     )
 
 

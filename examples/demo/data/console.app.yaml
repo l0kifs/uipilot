@@ -136,7 +136,7 @@ actions:
     prev: [act_cs_sign_in_submit]
     next: [act_cs_view_dashboard]
     params:
-      - { key: mfa_code, type: secret, required: true }
+      - { key: mfa_code, type: secret, required: true, satisfied_by: totp }
     steps:
       - { op: fill,  element: cs_input_mfa, value: "{{mfa_code}}" }
       - { op: click, element: cs_btn_verify }
