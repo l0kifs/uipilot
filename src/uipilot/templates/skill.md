@@ -162,6 +162,15 @@ capabilities:                  # named adapters the engine invokes by key (see c
   storage_state: { impl: "capabilities:playwright_storage_state" }
 ```
 
+**Env-bound values via `.uipilot/.env`.** Any `{ from: env, name: X }` token and
+every app `base_url { env: X }` resolves `X` from the process environment — and,
+as a default, from an optional **`.uipilot/.env`** file (`KEY=value` lines). Put
+per-project config there — base URLs, and credentials for login flows (e.g.
+`APP_EMAIL` / `APP_PASSWORD` wired to tokens a sign-in action's `fill` steps
+reference as `{{email}}`/`{{password}}`). A real shell variable of the same name
+overrides the file. `.env` is git-ignored by default — never commit real
+secrets; reference them from the pack, don't inline them.
+
 ### `data/<app>.app.yaml`
 
 ```yaml

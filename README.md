@@ -98,11 +98,20 @@ uipilot --pack examples/demo verify --flow create_project_with_credential
 ```
 .uipilot/                     # the pack dir (scaffolded by `uipilot init`)
 ├── flowmap.config.yaml       # binds apps, tokens, risk taxonomy, capabilities
+├── .env                      # (optional, git-ignored) env-bound token/base_url defaults
 ├── capabilities.py           # (optional) named auth adapters the engine calls by key
 └── data/
     ├── <app>.app.yaml        # one per app: app header + elements + actions
     └── flows.yaml            # named multi-app flows (+ shared/API actions)
 ```
+
+**Environment via `.uipilot/.env`.** Tokens declared `{ from: env, name: X }`
+and each app's `base_url { env: X }` resolve `X` from the process environment,
+falling back to a `KEY=value` line in an optional **`.uipilot/.env`** — so a
+project can keep base URLs and login credentials (e.g. `APP_EMAIL` /
+`APP_PASSWORD` wired to tokens a sign-in flow's steps consume) on disk without
+exporting shell vars. A real shell variable of the same name wins over the file;
+`.env` is git-ignored, so real secrets never land in version control.
 
 * **Element** — a node with a structured selector (default `css`/`testid`; XPath
   via a `css` `xpath=…` string; `role`/`label`/`text` available but text-based

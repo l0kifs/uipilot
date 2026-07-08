@@ -17,6 +17,7 @@ from uipilot.domain.errors import CapabilityError, PackError
 from uipilot.domain.model import CapabilitySpec, Config
 from uipilot.infrastructure import pack_loader as pl
 from uipilot.infrastructure.capabilities import CapabilityRegistry
+from uipilot.infrastructure.env_file import parse_env, read_env_file
 
 _ROOT = next(p for p in Path(__file__).resolve().parents if (p / "pyproject.toml").exists())
 DEMO = _ROOT / "examples" / "demo"
@@ -43,6 +44,69 @@ def test_read_yaml_empty_file_is_empty_dict(tmp_path):
     p = tmp_path / "empty.yaml"
     p.write_text("")
     assert pl._read_yaml(p) == {}
+
+
+# ---------------------------------------------------------------------------
+# env_file — .env parsing + reading
+# ---------------------------------------------------------------------------
+
+
+def test_parse_env_basic_pairs():
+    env = parse_env("APP_EMAIL=user@example.com\nAPP_PASSWORD=hunter2\n")
+    assert env == {"APP_EMAIL": "user@example.com", "APP_PASSWORD": "hunter2"}
+
+
+def test_parse_env_skips_comments_and_blanks():
+    env = parse_env("# a comment\n\n   \nKEY=value\n")
+    assert env == {"KEY": "value"}
+
+
+def test_parse_env_strips_export_and_whitespace():
+    env = parse_env("export KEY = value \n")
+    assert env == {"KEY": "value"}
+
+
+def test_parse_env_quoted_values_preserve_inner_whitespace_and_hash():
+    env = parse_env("A='  spaced  '\nB=\"pa#ss word\"\n")
+    assert env == {"A": "  spaced  ", "B": "pa#ss word"}
+
+
+def test_parse_env_double_quote_escapes_expand():
+    env = parse_env(r'A="line1\nline2\ttab"' + "\n" + r'B="back\\slash"' + "\n")
+    assert env == {"A": "line1\nline2\ttab", "B": "back\\slash"}
+
+
+def test_parse_env_single_quotes_are_literal():
+    assert parse_env(r"A='no\nescape'") == {"A": r"no\nescape"}
+
+
+def test_parse_env_drops_inline_comment_on_unquoted_value():
+    assert parse_env("KEY=value   # trailing note") == {"KEY": "value"}
+
+
+def test_parse_env_ignores_text_after_closing_quote():
+    assert parse_env('KEY="value" # note') == {"KEY": "value"}
+
+
+def test_parse_env_skips_lines_without_equals_or_empty_key():
+    assert parse_env("NOT_A_PAIR\n=orphan\nKEY=ok\n") == {"KEY": "ok"}
+
+
+def test_parse_env_empty_value():
+    assert parse_env("KEY=\nOTHER=   \n") == {"KEY": "", "OTHER": ""}
+
+
+def test_parse_env_unterminated_quote_falls_back_to_literal():
+    assert parse_env('KEY="oops') == {"KEY": '"oops'}
+
+
+def test_read_env_file_missing_returns_empty(tmp_path):
+    assert read_env_file(tmp_path / ".env") == {}
+
+
+def test_read_env_file_reads_from_disk(tmp_path):
+    (tmp_path / ".env").write_text("TOKEN=abc\n", encoding="utf-8")
+    assert read_env_file(tmp_path / ".env") == {"TOKEN": "abc"}
 
 
 # ---------------------------------------------------------------------------

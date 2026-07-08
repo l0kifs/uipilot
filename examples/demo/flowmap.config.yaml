@@ -6,6 +6,10 @@ apps: [console, portal]
 tokens:
   prefix: { from: env, name: TEST_ENTITY_PREFIX, default: "demo" }
   seq:    { from: counter }
+  # Login email, sourced from the environment (or .uipilot/.env) — see
+  # .env.example. The password is a `secret` param, so it is never baked in
+  # from config; it is supplied explicitly at compile time.
+  console_email: { from: env, name: CONSOLE_EMAIL, default: "ops@demo.test" }
 
 risk:
   levels: [low, admin-control, credential, destructive, money-moving]

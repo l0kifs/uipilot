@@ -34,6 +34,37 @@ def test_open_pack_defaults_to_os_environ(monkeypatch):
     assert pctx.runtime.token("prefix") == "envval"
 
 
+def _copy_pack(tmp_path: Path) -> Path:
+    import shutil
+
+    dest = tmp_path / "pack"
+    shutil.copytree(DEMO, dest)
+    return dest
+
+
+def test_open_pack_reads_dotenv_from_pack_dir(tmp_path):
+    pack_dir = _copy_pack(tmp_path)
+    (pack_dir / ".env").write_text("TEST_ENTITY_PREFIX=fromfile\n", encoding="utf-8")
+
+    # Empty explicit env → the pack's .env supplies the env-bound token default.
+    pctx = open_pack(pack_dir, env={})
+    assert pctx.runtime.token("prefix") == "fromfile"
+
+
+def test_process_env_wins_over_dotenv(tmp_path):
+    pack_dir = _copy_pack(tmp_path)
+    (pack_dir / ".env").write_text("TEST_ENTITY_PREFIX=fromfile\n", encoding="utf-8")
+
+    pctx = open_pack(pack_dir, env={"TEST_ENTITY_PREFIX": "fromproc"})
+    assert pctx.runtime.token("prefix") == "fromproc"
+
+
+def test_open_pack_without_dotenv_is_unaffected(tmp_path):
+    pack_dir = _copy_pack(tmp_path)  # no .env written
+    pctx = open_pack(pack_dir, env={"TEST_ENTITY_PREFIX": "demo"})
+    assert pctx.runtime.token("prefix") == "demo"
+
+
 @pytest.fixture
 def pctx(pack):
     from uipilot.domain.templating import RuntimeContext

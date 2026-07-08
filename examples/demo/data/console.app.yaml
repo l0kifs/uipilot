@@ -120,7 +120,9 @@ actions:
     prev: []
     next: [act_cs_sign_in_mfa]
     params:
-      - { key: email,    type: string, required: true, default: "ops@{{prefix}}.test" }
+      # email resolves from the CONSOLE_EMAIL env var (or .uipilot/.env); password
+      # is a secret, so it is supplied explicitly at compile time, never from config.
+      - { key: email,    type: string, required: true, default: "{{console_email}}" }
       - { key: password, type: secret, required: true }
     steps:
       - { op: fill,  element: cs_input_email,    value: "{{email}}" }

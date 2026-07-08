@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-08
+
+### Added
+
+- **`.uipilot/.env` support.** A pack now reads an optional `.env` file from its
+  directory (`KEY=value` lines) and uses it as **defaults** for env-bound values
+  — `{ from: env, name: X }` tokens and app `base_url { env: X }`. This lets a
+  project keep base URLs and login credentials (e.g. `APP_EMAIL` / `APP_PASSWORD`
+  wired to a sign-in flow's steps) on disk without exporting shell variables. A
+  real process variable of the same name takes precedence over the file, and
+  `.env` is git-ignored so real secrets stay out of version control. The format
+  is the conventional dotenv subset (comments, `export`, single/double quotes,
+  inline comments) and is dependency-free. The bundled `examples/demo` pack
+  demonstrates it: a `.env.example` documents every env var the pack reads, and
+  the console sign-in `email` resolves from a `CONSOLE_EMAIL`-bound token.
+
 ## [0.5.0] - 2026-07-08
 
 ### Added
@@ -128,7 +144,8 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/l0kifs/uipilot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/l0kifs/uipilot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/l0kifs/uipilot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/l0kifs/uipilot/compare/v0.2.0...v0.3.0

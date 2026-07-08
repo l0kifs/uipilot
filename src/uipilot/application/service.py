@@ -24,6 +24,7 @@ from uipilot.domain.model import Action, Element, Pack
 from uipilot.domain.templating import RuntimeContext
 from uipilot.domain.validation import ValidationReport
 from uipilot.infrastructure.capabilities import CapabilityRegistry
+from uipilot.infrastructure.env_file import ENV_FILENAME, read_env_file
 from uipilot.infrastructure.markdown_importer import import_md, write_seed
 from uipilot.infrastructure.pack_loader import load_pack
 from uipilot.infrastructure.scaffold import init_project as _init_project
@@ -39,9 +40,18 @@ class PackContext:
 
 
 def open_pack(path: str | Path, env: Optional[dict] = None) -> PackContext:
-    """Load a pack and build its runtime context (env-bound token resolution)."""
+    """Load a pack and build its runtime context (env-bound token resolution).
+
+    The pack's optional ``.env`` (``<pack>/.env`` — i.e. ``.uipilot/.env`` in a
+    scaffolded project) supplies **default** values for env-bound tokens and base
+    URLs, so a project can keep credentials and hostnames on disk without
+    exporting shell variables. A real process (or explicitly injected) variable
+    of the same name always takes precedence over the file.
+    """
     pack = load_pack(path)
-    runtime = RuntimeContext(pack.config, env=dict(os.environ if env is None else env))
+    process_env = dict(os.environ if env is None else env)
+    file_env = read_env_file(pack.root / ENV_FILENAME)
+    runtime = RuntimeContext(pack.config, env={**file_env, **process_env})
     return PackContext(pack=pack, runtime=runtime)
 
 
