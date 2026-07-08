@@ -20,7 +20,27 @@ to a new web app means authoring a new pack, not touching the engine.
 
 ---
 
-## Install
+## Install & set up in your project
+
+```bash
+uv tool install uipilot          # install the CLI globally
+cd your-project
+uipilot init                     # scaffold a pack + agent instructions here
+```
+
+`uipilot init` writes a minimal, valid pack skeleton (`flowmap.config.yaml`,
+`data/`, `capabilities.py`) plus an agent instruction file — a Claude Code skill
+(`.claude/skills/uipilot/SKILL.md`) and/or an `AGENTS.md` section (`--agent
+claude|agents`, repeatable). Then just **ask your agent to run a flow**: it
+explores the app, fills the pack, and drives it for you. Re-running `init`
+refreshes the skill but never clobbers a pack you've started (use `--force` to
+overwrite).
+
+Because `init` scaffolds into the cwd, every later `uipilot …` call finds the
+pack with **no `--pack` flag** (resolution order: `$UIPILOT_PACK` → a
+`flowmap.config.yaml` in the cwd → the bundled `examples/demo` pack).
+
+### From source
 
 ```bash
 uv sync                                    # creates .venv, installs from uv.lock
@@ -28,9 +48,6 @@ uv run uipilot --pack examples/demo apps
 ```
 
 Built with the `uv_build` backend; dependencies are locked in `uv.lock`.
-
-`--pack` points at a pack directory. It defaults to `$UIPILOT_PACK`, then a
-`flowmap.config.yaml` in the cwd, then the bundled `examples/demo` pack.
 
 ---
 
@@ -88,10 +105,11 @@ your_pack/
 See [`examples/demo/`](examples/demo/) for a complete two-app pack exercising
 every feature.
 
-**Docs:** [`docs/AGENT_GUIDE.md`](docs/AGENT_GUIDE.md) — driving flows as an agent
-(the core loop, execution contract, safety) · [`docs/USE_CASES.md`](docs/USE_CASES.md)
-— business use cases at a glance · [`docs/PACK_AUTHORING.md`](docs/PACK_AUTHORING.md)
-— pack field reference and porting checklist.
+**Docs:** [`src/uipilot/templates/skill.md`](src/uipilot/templates/skill.md) — the
+agent guide, shipped and installed by `uipilot init` (core loop, execution
+contract, safety) · [`docs/USE_CASES.md`](docs/USE_CASES.md) — business use cases
+at a glance · [`docs/PACK_AUTHORING.md`](docs/PACK_AUTHORING.md) — pack field
+reference and porting checklist.
 
 ---
 
@@ -111,6 +129,7 @@ every feature.
 | `verify …` | Emit a read-only probe to detect live UI drift |
 | `emit --format pw-pom\|pw-test` | Generate Python POM classes / a pw-test spec |
 | `capabilities [--check]` | List (and import-check) the pack's auth adapters |
+| `init [dir] [--agent claude\|agents] [--force]` | Scaffold a pack + agent instructions in a project |
 | `import-md <file> --out <dir>` | One-time: seed a pack from a retired Markdown map |
 
 ### `script`

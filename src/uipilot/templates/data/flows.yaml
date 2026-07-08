@@ -1,0 +1,3 @@
+# Named, multi-step flows the agent compiles into scripts.
+# actions: {}   # (optional) shared / API actions usable across flows
+flows: {}        # id -> { app, description, path: [ ...action ids... ] }

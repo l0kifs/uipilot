@@ -26,6 +26,7 @@ from uipilot.domain.validation import ValidationReport
 from uipilot.infrastructure.capabilities import CapabilityRegistry
 from uipilot.infrastructure.markdown_importer import import_md, write_seed
 from uipilot.infrastructure.pack_loader import load_pack
+from uipilot.infrastructure.scaffold import init_project as _init_project
 
 
 @dataclass
@@ -200,6 +201,11 @@ def list_capabilities(pctx: PackContext, check: bool = False) -> list[dict]:
     checks = reg.check_all() if check else {}
     return [{"key": key, "impl": reg.spec(key),
              "error": checks.get(key) if check else None} for key in reg.keys]
+
+
+def init_project(dest: str | Path, agents: list[str], force: bool = False) -> dict:
+    """Scaffold a pack skeleton + agent instruction files under ``dest``."""
+    return _init_project(dest, agents=agents, force=force)
 
 
 def import_markdown(md_file: str | Path, out_dir: str | Path) -> dict:

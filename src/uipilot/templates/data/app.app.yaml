@@ -1,0 +1,15 @@
+# One app = one file. The agent fills elements + actions by exploring the app.
+# Rename this file to <your-app-id>.app.yaml and update `id` + `apps:` in config.
+app:
+  id: app                      # must match this filename (<id>.app.yaml)
+  base_url:
+    env: APP_UI_URL
+    default: "http://localhost:3000"
+  id_prefix: app               # namespace for this app's element/action ids
+  # auth:
+  #   entry_flow: sign_in
+  #   storage_state_key: app
+
+elements: {}                   # id -> { type, selector, purpose }
+
+actions: {}                    # id -> { purpose, route, steps, prev, next, ... }

@@ -533,6 +533,29 @@ def capabilities(ctx: typer.Context, check: bool = typer.Option(False, "--check"
 # ---------------------------------------------------------------------------
 
 
+@app.command()
+def init(
+    directory: str = typer.Argument(".", help="project directory to scaffold"),
+    agent: list[str] = typer.Option(["claude", "agents"], "--agent",
+                                    help="claude | agents (repeatable)"),
+    force: bool = typer.Option(False, "--force",
+                               help="overwrite existing pack files"),
+) -> None:
+    """Scaffold a pack + agent instructions so an agent can use uipilot here."""
+    result = service.init_project(directory, agents=agent, force=force)
+    console.print(f"[green]✓[/green] uipilot ready in [bold]{result['pack']}[/bold]")
+    for rel in result["created"]:
+        console.print(f"  [green]created[/green]  {rel}")
+    for rel in result["updated"]:
+        console.print(f"  [yellow]updated[/yellow]  {rel}")
+    for rel in result["skipped"]:
+        console.print(f"  [dim]skipped (exists)[/dim]  {rel}")
+    console.print("\n[bold]Next:[/bold]")
+    console.print("  1. Edit flowmap.config.yaml + data/app.app.yaml: your app id and base_url.")
+    console.print("  2. Ask your agent to map and run a flow — it fills the pack for you.")
+    console.print("  3. uipilot validate   # check the map is self-consistent")
+
+
 @app.command("import-md")
 def import_md_cmd(
     ctx: typer.Context,

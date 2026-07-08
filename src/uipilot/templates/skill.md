@@ -45,6 +45,7 @@ uipilot [--pack DIR] [--format json|table|md] <command> [opts]
 | `verify [--flow\|--app\|--action] [--drive] [--allow-gated]` | read-only drift probe vs live app |
 | `emit --format pw-pom\|pw-test [--app] [--flow]` | build artifacts: POM classes / @playwright/test spec |
 | `capabilities [--check]` | list (and binding-check) the pack's auth adapters |
+| `init [DIR] [--agent claude\|agents]` | scaffold a pack skeleton + this skill (usually run once by the human) |
 | `import-md FILE --out DIR` | one-time: seed a pack from a legacy markdown map |
 
 ## The core loop (running a flow)

@@ -37,6 +37,10 @@ module-root = "src"
 testpaths = ["tests"]
 addopts = "-ra --cov=uipilot --cov-report=term-missing --cov-fail-under=90"
 
+[tool.coverage.run]
+# Templates are inert scaffolding shipped as package data, not code under test.
+omit = ["*/uipilot/templates/*"]
+
 # --- Static analysis -------------------------------------------------------
 
 [tool.ruff]

@@ -35,4 +35,5 @@ cli.main
 cli.show_action
 cli.show_element
 cli.emit
+cli.init
 cli.import_md_cmd

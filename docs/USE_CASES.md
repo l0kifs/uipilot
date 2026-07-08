@@ -18,9 +18,10 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 | 8 | Know required inputs up front | A | `flow N --params` | Aggregated param manifest, one lookup |
 | 9 | Human preview before a risky run | H | `script --flow N --format human` | Plain-English steps + risk + teardown |
 | 10 | API provisioning + backend cross-check | A | api actions in flow | Fast setup + assert UI-created record via REST |
-| 11 | Author / port a new app | A/D | write pack + `validate` | New app = new pack, zero engine change |
-| 12 | Seed a pack from a legacy MD map | D | `import-md FILE --out DIR` | One-time bootstrap |
-| 13 | Auth/secret adapters (MFA, session) | A | `capabilities` | Mint secrets, reuse `storageState` |
+| 11 | Bootstrap in a project | D | `init` | Scaffold pack skeleton + agent skill/AGENTS.md |
+| 12 | Author / port a new app | A/D | fill pack + `validate` | New app = new pack, zero engine change |
+| 13 | Seed a pack from a legacy MD map | D | `import-md FILE --out DIR` | One-time bootstrap |
+| 14 | Auth/secret adapters (MFA, session) | A | `capabilities` | Mint secrets, reuse `storageState` |
 
 ## Core runtime loop (UC 1)
 1. `apps` → pick app · `flows` → pick flow (check `guard`).
@@ -46,4 +47,5 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 - **Flow** — ordered action path; reuse layered L1–L4 (shared → subflow → aliased → guard).
 - **Capture** — value one action produces, consumed later as `{{captured.x}}`; bridges UI↔API.
 
-See `AGENT_GUIDE.md` (running) and `PACK_AUTHORING.md` (authoring).
+See the shipped skill `src/uipilot/templates/skill.md` (running, installed by
+`uipilot init`) and `PACK_AUTHORING.md` (authoring).
