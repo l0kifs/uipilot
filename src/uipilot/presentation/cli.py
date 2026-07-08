@@ -619,7 +619,9 @@ def capabilities(
 def init(
     directory: str = typer.Argument(".", help="project directory to scaffold"),
     agent: list[str] = typer.Option(
-        ["claude", "agents"], "--agent", help="claude | agents (repeatable)"
+        ["claude"],
+        "--agent",
+        help="claude | agents (repeatable; defaults to claude only, add --agent agents for AGENTS.md)",
     ),
     force: bool = typer.Option(False, "--force", help="overwrite existing pack files"),
 ) -> None:

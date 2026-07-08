@@ -30,9 +30,10 @@ uipilot init                     # scaffold a pack + agent instructions here
 
 `uipilot init` writes a minimal, valid pack skeleton under `.uipilot/`
 (`.uipilot/flowmap.config.yaml`, `.uipilot/data/`, `.uipilot/capabilities.py`)
-plus an agent instruction file at the project root — a Claude Code skill
-(`.claude/skills/uipilot/SKILL.md`) and/or an `AGENTS.md` section (`--agent
-claude|agents`, repeatable). Then just **ask your agent to run a flow**: it
+plus a Claude Code skill (`.claude/skills/uipilot/SKILL.md`) by default. To also
+write an `AGENTS.md` section, opt in with `--agent agents` (the `--agent` option
+is repeatable, e.g. `uipilot init --agent claude --agent agents`). Then just
+**ask your agent to run a flow**: it
 explores the app, fills the pack, and drives it for you. Re-running `init`
 refreshes the skill but never clobbers a pack you've started (use `--force` to
 overwrite).
@@ -107,10 +108,11 @@ See [`examples/demo/`](examples/demo/) for a complete two-app pack exercising
 every feature.
 
 **Docs:** [`src/uipilot/templates/skill.md`](src/uipilot/templates/skill.md) — the
-agent guide, shipped and installed by `uipilot init` (core loop, execution
-contract, safety) · [`docs/USE_CASES.md`](docs/USE_CASES.md) — business use cases
-at a glance · [`docs/PACK_AUTHORING.md`](docs/PACK_AUTHORING.md) — pack field
-reference and porting checklist.
+agent guide, shipped and installed by `uipilot init`; the single source of truth
+for the core loop, execution contract, safety, and the full **pack authoring
+schema** (config, app/element/action/flow field reference, selector conversion,
+step ops) · [`docs/USE_CASES.md`](docs/USE_CASES.md) — business use cases at a
+glance.
 
 ---
 
@@ -130,7 +132,7 @@ reference and porting checklist.
 | `verify …` | Emit a read-only probe to detect live UI drift |
 | `emit --format pw-pom\|pw-test` | Generate Python POM classes / a pw-test spec |
 | `capabilities [--check]` | List (and import-check) the pack's auth adapters |
-| `init [dir] [--agent claude\|agents] [--force]` | Scaffold a pack + agent instructions in a project |
+| `init [dir] [--agent claude\|agents] [--force]` | Scaffold a pack + Claude skill (add `--agent agents` for AGENTS.md) |
 | `import-md <file> --out <dir>` | One-time: seed a pack from a retired Markdown map |
 
 ### `script`

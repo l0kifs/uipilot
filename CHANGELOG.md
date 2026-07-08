@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-08
+
+### Changed
+
+- **`uipilot init` now writes only the Claude Code skill by default** (`.claude/skills/uipilot/SKILL.md`).
+  `AGENTS.md` is no longer created unless you opt in with `--agent agents`
+  (e.g. `uipilot init --agent claude --agent agents`).
+- **The shipped agent guide (`skill.md`) is now the single source of truth**,
+  carrying the full pack authoring schema (config, app/element/action/flow field
+  reference, selector conversion, step ops) in a new *Authoring & maintaining a
+  pack* section.
+- Bumped runtime dependencies (`typer>=0.26.8`, `rich>=15.0.0`, `pyyaml>=6.0.3`)
+  and dev tooling (`pytest-cov`, `ruff`, `ty`, `vulture`).
+
+### Removed
+
+- **`docs/PACK_AUTHORING.md`** — its content is now folded into the shipped
+  skill so authors and agents read one canonical guide.
+
 ## [0.2.0] - 2026-07-08
 
 ### Changed
@@ -53,6 +72,7 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/l0kifs/uipilot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/l0kifs/uipilot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/l0kifs/uipilot/releases/tag/v0.1.0

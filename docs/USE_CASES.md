@@ -18,7 +18,7 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 | 8 | Know required inputs up front | A | `flow N --params` | Aggregated param manifest, one lookup |
 | 9 | Human preview before a risky run | H | `script --flow N --format human` | Plain-English steps + risk + teardown |
 | 10 | API provisioning + backend cross-check | A | api actions in flow | Fast setup + assert UI-created record via REST |
-| 11 | Bootstrap in a project | D | `init` | Scaffold pack skeleton + agent skill/AGENTS.md |
+| 11 | Bootstrap in a project | D | `init` | Scaffold pack skeleton + Claude skill (`--agent agents` for AGENTS.md) |
 | 12 | Author / port a new app | A/D | fill pack + `validate` | New app = new pack, zero engine change |
 | 13 | Seed a pack from a legacy MD map | D | `import-md FILE --out DIR` | One-time bootstrap |
 | 14 | Auth/secret adapters (MFA, session) | A | `capabilities` | Mint secrets, reuse `storageState` |
@@ -47,5 +47,6 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 - **Flow** — ordered action path; reuse layered L1–L4 (shared → subflow → aliased → guard).
 - **Capture** — value one action produces, consumed later as `{{captured.x}}`; bridges UI↔API.
 
-See the shipped skill `src/uipilot/templates/skill.md` (running, installed by
-`uipilot init`) and `PACK_AUTHORING.md` (authoring).
+See the shipped skill `src/uipilot/templates/skill.md` (installed by
+`uipilot init`) for both running flows and the full pack authoring schema —
+section **Authoring & maintaining a pack**.

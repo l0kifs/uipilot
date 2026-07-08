@@ -113,6 +113,165 @@ Keep secret values out of the report (echo their param key, never the value).
 - `risk_max` / `crosses_app` tell you the blast radius before running.
 - **Gated risk** (e.g. `destructive`, `money-moving`): to only drift-check without side effects use `verify --flow NAME --drive` (walks the flow but refuses gated steps); add `--allow-gated` only when you truly intend the side effect. Add `--refuse-destructive` to `script` to hard-block emission of gated paths.
 
+## Authoring & maintaining a pack
+
+**You own the pack.** The human supplies only URLs, credentials, and rules — you
+explore the app and write the YAML. This is the full schema; nothing else is
+needed. Author or edit a pack when: there is no pack yet (or it's an empty
+scaffold), `verify` reports drift, or a new flow/element must be mapped. After
+any edit run `uipilot validate` until clean, then `uipilot script <flow>`.
+
+A pack is a directory (`.uipilot/` by default) with `flowmap.config.yaml`,
+`data/<app>.app.yaml` (one per app), `data/flows.yaml`, and `capabilities.py`.
+
+### `flowmap.config.yaml`
+
+```yaml
+pack: myapp
+apps: [console, portal]        # each id needs a data/<id>.app.yaml
+tokens:                        # expansions usable in param defaults
+  prefix: { from: env, name: TEST_ENTITY_PREFIX, default: "test" }
+  seq:    { from: counter }    # per-run monotonic counter, stable within a run
+risk:                          # YOUR taxonomy, low → most dangerous (data, not engine code)
+  levels: [low, admin-control, credential, destructive, money-moving]
+  gated:  [destructive, money-moving]   # what --refuse-destructive blocks
+capabilities:                  # named adapters the engine invokes by key (see capabilities.py)
+  totp:          { impl: "capabilities:totp_from_secret" }
+  storage_state: { impl: "capabilities:playwright_storage_state" }
+```
+
+### `data/<app>.app.yaml`
+
+```yaml
+app:
+  id: console
+  base_url: { env: CONSOLE_UI_URL, default: "http://127.0.0.1:4001" }
+  id_prefix: cs                  # namespace prefix for THIS app's element/action ids
+  auth:
+    entry_flow: console_sign_in  # prepended as an auth precondition unless --skip-auth
+    storage_state_key: console   # Playwright storageState reuse key
+elements:
+  cs_btn_create:                 # id is globally unique; prefix it with id_prefix
+    type: button                 # free-form (button/input/dialog/tab/link/table/row/text/toast/…)
+    section: "Projects list"     # optional grouping label
+    selector: { strategy: role, role: button, name: "Create" }
+    purpose: "Open the create dialog"
+actions:
+  act_cs_create:
+    purpose: "Create a project."
+    route: "/projects"           # appended to base_url for the navigate step
+    risk: low                    # must be one of config.risk.levels
+    elements: [cs_btn_create, cs_input_name, cs_toast_created]
+    prev: [act_cs_open_projects] # graph edges (drive `path`/`next`/`prev`)
+    next: []
+    params: [ { key: name, type: string, required: true, default: "{{prefix}}-{{seq}}" } ]
+    steps:
+      - { op: click,    element: cs_btn_create }
+      - { op: fill,     element: cs_input_name, value: "{{name}}" }
+      - { op: click,    element: cs_btn_submit }
+      - { op: wait_for, element: cs_toast_created }
+    captures: [ { key: id, from: url, pattern: "/projects/(?<id>[0-9a-f-]{36})" } ]
+```
+
+### Field reference
+
+| Entity | Fields |
+|---|---|
+| `App` | `id`, `package?`, `base_url{env, default}`, `id_prefix`, `auth{entry_flow, storage_state_key}?` |
+| `Element` | `id`, `type`, `section?`, `selector{…}`, `purpose?` |
+| `Action` (ui, default) | `purpose`, `route`, `risk`, `elements[]`, `prev[]`, `next[]`, `params[]`, `steps[]`, `captures[]`, `requires[]?`, `provides[]?` |
+| `Action` (api) | `transport: api`, `role` (`setup`\|`crosscheck`), `purpose`, `risk`, `call` (`"module:function"`), `params[]`, `captures[]`, `requires[]?`, `provides[]?` — **no** `route`/`elements`/`steps`/`prev`/`next` |
+| `Param` | `key`, `type` (`string`\|`enum`\|`secret`\|`address`\|`amount`\|`int`), `required?`, `default?`, `enum[]?`, `satisfied_by?` (capability key that mints the value, e.g. a `secret` `mfa_code` with `satisfied_by: totp`) |
+| `Step` | `op`, `element?`, `value?`, `wait_for?` (`{text}`\|`{textGone}`\|`{time}`), `scope?`, `optional?` |
+| `Capture` | `key`, `from` (`url`\|`element`\|`clipboard`\|`response`), `pattern?` (regex w/ named group), `path?` (JSONPath for `response`), `element?` |
+
+### Selectors — convert Playwright locator expressions to structured form
+
+Selectors are stored **structurally**, never as a raw `getByRole(...)` string, so
+they stay lintable and re-emittable. Strategies: `role` · `label` · `text` ·
+`testid` · `css` (author priority in that order). Keys: `strategy`, `role`,
+`name`, `text`, `label`, `css`, `testid`, `scope`, `exact`. `name` applies only
+to `role`/`label`/`text`.
+
+A UI map (or a live snapshot) usually gives you Playwright locator expressions —
+convert each one:
+
+| Locator expression | Structured selector |
+|---|---|
+| `getByRole('button', { name: 'Save' })` | `{ strategy: role, role: button, name: "Save" }` |
+| `getByRole('textbox', { name: 'Email' })` | `{ strategy: role, role: textbox, name: "Email" }` |
+| `getByLabel('Password')` | `{ strategy: label, label: "Password" }` |
+| `getByText('No tenants yet')` | `{ strategy: text, text: "No tenants yet" }` |
+| `getByTestId('submit')` | `{ strategy: testid, testid: "submit" }` |
+| CSS / `data-*` | `{ strategy: css, css: ".panel [data-role=x]" }` |
+| dialog's *Create* vs the page's *Create* | add `scope: dialog` → emits `getByRole('dialog').getByRole('button', { name: 'Create' })` |
+
+`name` is a **normalized, case-insensitive substring** match by default. So a
+map entry written as a regex — `name: /code/i`, `name: /Copy ID/` — becomes a
+plain literal: `{ strategy: role, role: textbox, name: "code" }`. Add
+`exact: true` only to force a full exact-name match. For an alternation regex
+like `/verify|submit/i`, pick the one literal the live app actually renders
+(snapshot it if unsure); for a name that varies per row/record, prefer a
+`testid` or a stable `text`/`css` anchor over a brittle `name`.
+
+### Step ops → Playwright-MCP tool
+
+`navigate`→`browser_navigate` (base_url+route) · `snapshot`→`browser_snapshot`
+(auto-inserted where the DOM changes) · `click`→`browser_click` ·
+`fill`/`type`→`browser_type` (or batched `browser_fill_form`) ·
+`select`→`browser_select_option` · `press`→`browser_press_key` ·
+`wait_for`→`browser_wait_for` (`{text}`/`{textGone}`/`{time}`, or derived from the
+awaited `element`) · `expect`→snapshot+assert · `capture`→url read /
+`browser_evaluate` · `upload`→`browser_file_upload`. Interacting ops
+(`click`/`fill`/`type`/`select`/`press`/`upload`) act on a fresh snapshot ref, so
+end a screen-changing step with a `wait_for` before the next interaction.
+
+### `data/flows.yaml`
+
+A `path` entry is one of: a bare action id · `{ use: <flow-id> }` (inline a
+subflow) · `{ action: <id>, as?: <alias>, params?: {…} }` (aliased invocation;
+`as:` namespaces its captures so an action can repeat).
+
+```yaml
+actions:                          # (optional) API actions, shared across flows
+  api_create: { transport: api, role: setup, app: console, call: "factories.x:create",
+                captures: [ { key: id, from: response, path: "$.id" } ] }
+  api_delete: { transport: api, role: setup, app: console, call: "factories.x:delete",
+                params: [ { key: id, type: string, required: true } ] }
+flows:
+  console_sign_in:                # L2 subflow, authored once, embedded anywhere
+    app: console
+    guard: { expect: { text: "Current session" } }   # L4: skip the flow if already true
+    path: [act_cs_sign_in, act_cs_mfa]
+  create_project:
+    app: console
+    path:
+      - use: console_sign_in
+      - act_cs_open_projects
+      - { action: act_cs_create, params: { name: "{{prefix}}-a" } }
+    teardown:                     # API deletes run after the flow, even on failure
+      - { action: api_delete, params: { id: "{{captured.id}}" } }
+```
+
+Captures bridge transports: an API `from: response` capture flows into a later
+UI step as `{{alias.key}}`, exactly like a UI `from: url` capture. A flow's
+`guard` is the "already done, skip if it passes" marker `flow NAME` surfaces.
+
+### `capabilities.py`
+
+The one place the pack hands executable Python to the engine (a TOTP generator,
+a storageState reader). Have these **call existing test-framework helpers**
+rather than reimplement auth. The engine never runs them during emit — it only
+import-checks them (`uipilot capabilities --check`).
+
+### Seeding from a legacy markdown map
+
+`uipilot import-md MAP.md --out <pack>` harvests element/action **ids** grouped
+by prefix but leaves every `selector`, `purpose`, and `steps` as `TODO` (it
+exits non-zero to flag the pack as unfinished). Treat it as a scaffold, not a
+finished pack: fill each `selector` from the map's locator expressions per the
+table above, write the `steps` recipes and `prev`/`next` edges, then `validate`.
+
 ## When to use which
 
 - "Run/automate/test flow X" → `script --flow X` → execute (core loop).
@@ -128,4 +287,4 @@ Keep secret values out of the report (echo their param key, never the value).
 - No engine domain vocabulary: apps/risk levels/tokens are all defined by the pack's `flowmap.config.yaml`. Read `apps` and `flows` before assuming ids.
 - `--batch` collapses adjacent field fills into one `browser_fill_form` (fewer round-trips).
 - `--skip-auth` drops the auth precondition (use only when already signed in).
-- **You own the pack.** The human supplies only URLs, credentials, and rules; you explore the app (drive it with Playwright MCP, `browser_snapshot` each screen) and author the pack yourself — see `docs/PACK_AUTHORING.md`. When `verify` reports drift, fix the offending element's selector in the YAML from the fresh snapshot and re-run `validate`; don't wait for a human to patch it.
+- **You own the pack.** The human supplies only URLs, credentials, and rules; you explore the app (drive it with Playwright MCP, `browser_snapshot` each screen) and author the pack yourself — see **Authoring & maintaining a pack** above for the full schema. When `verify` reports drift, fix the offending element's selector in the YAML from the fresh snapshot and re-run `validate`; don't wait for a human to patch it.
