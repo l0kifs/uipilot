@@ -643,6 +643,38 @@ def init(
     console.print("  3. uipilot validate   # check the map is self-consistent")
 
 
+@app.command()
+def update(
+    directory: str = typer.Argument(".", help="project directory to refresh"),
+    agent: list[str] = typer.Option(
+        [],
+        "--agent",
+        help="also install this target if missing: claude | agents (repeatable)",
+    ),
+) -> None:
+    """Refresh agent instruction files to the installed uipilot version.
+
+    Auto-detects the files `init` scaffolded (the Claude skill, an AGENTS.md
+    block) and rewrites them. Pack files under .uipilot/ are never touched.
+    """
+    result = service.update_project(directory, agents=agent)
+    if not result["refreshed"]:
+        err_console.print(
+            "[red]nothing to update[/red]: no uipilot agent instruction files found — "
+            "run `uipilot init` first"
+        )
+        raise typer.Exit(2)
+    for item in result["refreshed"]:
+        was = f"v{item['from']}" if item["from"] else "unstamped"
+        console.print(f"  [yellow]updated[/yellow]  {item['file']}  ({was} → v{item['to']})")
+    pack_v = result["pack_scaffolded"]
+    if pack_v and pack_v != result["version"]:
+        console.print(
+            f"  [dim]pack was scaffolded by v{pack_v}; packs are never auto-migrated — "
+            "run `uipilot validate` to check it against the new version[/dim]"
+        )
+
+
 @app.command("import-md")
 def import_md_cmd(
     ctx: typer.Context,

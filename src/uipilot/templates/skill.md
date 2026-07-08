@@ -46,6 +46,7 @@ uipilot [--pack DIR] [--format json|table|md] <command> [opts]
 | `emit --format pw-pom\|pw-test [--app] [--flow]` | build artifacts: POM classes / @playwright/test spec |
 | `capabilities [--check]` | list (and binding-check) the pack's auth adapters |
 | `init [DIR] [--agent claude\|agents]` | scaffold a pack skeleton + this skill (usually run once by the human) |
+| `update [DIR] [--agent claude\|agents]` | refresh this skill / AGENTS.md to the installed uipilot version; never touches the pack |
 | `import-md FILE --out DIR` | one-time: seed a pack from a legacy markdown map |
 
 ## The core loop (running a flow)

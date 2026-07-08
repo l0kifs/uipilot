@@ -1,5 +1,5 @@
 # uipilot pack config — edit to describe YOUR app(s).
-# Reference: the uipilot skill (.claude/skills/uipilot/SKILL.md) + PACK_AUTHORING.
+# Reference: the uipilot skill (.claude/skills/uipilot/SKILL.md).
 pack: PACK_NAME
 apps: [app]                    # one id per app; each needs data/<id>.app.yaml
 

@@ -1,4 +1,4 @@
-"""Project bootstrap — ``uipilot init``.
+"""Project bootstrap — ``uipilot init`` — and refresh — ``uipilot update``.
 
 Writes two things into a target project so an agent can start using uipilot:
 
@@ -11,14 +11,18 @@ Writes two things into a target project so an agent can start using uipilot:
 
 Idempotent: an existing pack file is left untouched (never clobber work in
 progress) unless ``force``; agent instruction files are always refreshed to the
-installed version. This is the one infrastructure module that reads the packaged
-``uipilot.templates`` resources and writes into the user's tree.
+installed version and stamped with it, so ``uipilot update`` can detect and
+refresh stale copies after a tool upgrade. This is the one infrastructure module
+that reads the packaged ``uipilot.templates`` resources and writes into the
+user's tree.
 """
 
 from __future__ import annotations
 
-from importlib import resources
+import re
+from importlib import metadata, resources
 from pathlib import Path
+from typing import Optional
 
 from uipilot.infrastructure.pack_loader import PACK_SUBDIR
 
@@ -30,6 +34,12 @@ AGENT_TARGETS = {
 
 _MARK_START = "<!-- uipilot:start -->"
 _MARK_END = "<!-- uipilot:end -->"
+
+# Version stamps: agent instruction files carry an HTML-comment stamp, the pack
+# config a YAML-comment stamp. Both are machine-parseable so `update` can report
+# installed vs. scaffolded versions.
+_STAMP_RE = re.compile(r"<!-- uipilot:v(\S+) ")
+_PACK_STAMP_RE = re.compile(r"# scaffolded by uipilot v(\S+)")
 
 # Pack skeleton: (destination relative path, template resource path).
 _SKELETON = [
@@ -44,9 +54,36 @@ def _template(name: str) -> str:
     return resources.files("uipilot.templates").joinpath(name).read_text(encoding="utf-8")
 
 
+def installed_version() -> str:
+    """The installed uipilot distribution version (best effort)."""
+    try:
+        return metadata.version("uipilot")
+    except metadata.PackageNotFoundError:  # pragma: no cover - running unpackaged
+        return "unknown"
+
+
+def _stamp() -> str:
+    return (
+        f"<!-- uipilot:v{installed_version()} — generated file, do not edit by hand; "
+        "refresh with `uipilot update` after upgrading uipilot -->"
+    )
+
+
+def stamped_version(text: str) -> Optional[str]:
+    """The version recorded in a scaffolded file's stamp, if any."""
+    m = _STAMP_RE.search(text)
+    return m.group(1) if m else None
+
+
 def skill_text() -> str:
-    """The shipped agent guide, verbatim (with skill frontmatter)."""
-    return _template("skill.md")
+    """The shipped agent guide with a version stamp under its skill frontmatter."""
+    text = _template("skill.md")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            insert_at = text.index("\n", end + 1) + 1
+            return f"{text[:insert_at]}{_stamp()}\n{text[insert_at:]}"
+    return f"{_stamp()}\n{text}"  # pragma: no cover - shipped skill has frontmatter
 
 
 def _skill_body() -> str:
@@ -81,22 +118,20 @@ def init_project(dest: str | Path, agents: list[str], force: bool = False) -> di
         content = _template(tpl)
         if rel == "flowmap.config.yaml":
             content = content.replace("PACK_NAME", root.name)
+            content = (
+                f"# scaffolded by uipilot v{installed_version()} — this file is yours; "
+                "`uipilot update` never touches it.\n" + content
+            )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         (updated if existed else created).append(rel_display)
 
     # 2. Agent instruction files — always refreshed to the installed version.
     for agent in agents:
-        rel = AGENT_TARGETS.get(agent)
-        if rel is None:
+        if agent not in AGENT_TARGETS:
             continue
-        target = root / rel
-        existed = target.exists()
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if agent == "agents":
-            target.write_text(_render_agents_md(target), encoding="utf-8")
-        else:
-            target.write_text(skill_text(), encoding="utf-8")
+        existed = (root / AGENT_TARGETS[agent]).exists()
+        rel = _write_agent(root, agent)
         (updated if existed else created).append(rel)
 
     return {
@@ -105,6 +140,60 @@ def init_project(dest: str | Path, agents: list[str], force: bool = False) -> di
         "updated": updated,
         "skipped": skipped,
         "agents": [a for a in agents if a in AGENT_TARGETS],
+    }
+
+
+def _write_agent(root: Path, agent: str) -> str:
+    """Write one agent instruction file at the installed version; returns its rel path."""
+    rel = AGENT_TARGETS[agent]
+    target = root / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if agent == "agents":
+        target.write_text(_render_agents_md(target), encoding="utf-8")
+    else:
+        target.write_text(skill_text(), encoding="utf-8")
+    return rel
+
+
+def update_project(dest: str | Path, agents: Optional[list[str]] = None) -> dict:
+    """Refresh agent instruction files to the installed version — ``uipilot update``.
+
+    Auto-detects which instruction files the project already has (the Claude
+    skill; an ``AGENTS.md`` carrying uipilot's marked block) and rewrites them;
+    ``agents`` adds targets that don't exist yet. Pack files are never touched —
+    ``pack_scaffolded`` in the result just reports the version recorded by
+    ``init`` so callers can surface schema drift.
+    """
+    root = Path(dest).expanduser().resolve()
+
+    detected = []
+    for agent, rel in AGENT_TARGETS.items():
+        target = root / rel
+        if not target.exists():
+            continue
+        if agent == "agents" and _MARK_START not in target.read_text(encoding="utf-8"):
+            continue
+        detected.append(agent)
+    requested = [a for a in (agents or []) if a in AGENT_TARGETS]
+    targets = list(dict.fromkeys(detected + requested))
+
+    refreshed: list[dict] = []
+    for agent in targets:
+        target = root / AGENT_TARGETS[agent]
+        previous = stamped_version(target.read_text(encoding="utf-8")) if target.exists() else None
+        rel = _write_agent(root, agent)
+        refreshed.append({"file": rel, "from": previous, "to": installed_version()})
+
+    pack_config = root / PACK_SUBDIR / "flowmap.config.yaml"
+    pack_scaffolded = None
+    if pack_config.exists():
+        m = _PACK_STAMP_RE.search(pack_config.read_text(encoding="utf-8"))
+        pack_scaffolded = m.group(1) if m else None
+
+    return {
+        "version": installed_version(),
+        "refreshed": refreshed,
+        "pack_scaffolded": pack_scaffolded,
     }
 
 

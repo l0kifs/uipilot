@@ -1,10 +1,12 @@
-"""`uipilot init` — project bootstrap: scaffold a valid pack + agent instructions."""
+"""`uipilot init`/`update` — scaffold a valid pack + agent instructions, refresh them."""
 
 from __future__ import annotations
 
 from uipilot.domain.validation import validate
 from uipilot.infrastructure import scaffold
 from uipilot.infrastructure.pack_loader import load_pack
+
+INSTALLED = scaffold.installed_version()
 
 
 def test_init_scaffolds_a_valid_pack(tmp_path):
@@ -62,3 +64,63 @@ def test_unknown_agent_is_ignored(tmp_path):
     result = scaffold.init_project(tmp_path, agents=["bogus"])
     assert result["agents"] == []
     assert not (tmp_path / ".claude").exists()
+
+
+def test_scaffolded_files_carry_version_stamps(tmp_path):
+    scaffold.init_project(tmp_path, agents=["claude", "agents"])
+    skill = (tmp_path / ".claude/skills/uipilot/SKILL.md").read_text()
+    # stamped with the installed version, after the frontmatter (skill loaders
+    # require the frontmatter to open the file)
+    assert skill.startswith("---\nname: uipilot")
+    assert scaffold.stamped_version(skill) == INSTALLED
+    assert "do not edit by hand" in skill
+    assert scaffold.stamped_version((tmp_path / "AGENTS.md").read_text()) == INSTALLED
+    # the pack config records the scaffolding version for future migrations
+    config = (tmp_path / ".uipilot/flowmap.config.yaml").read_text()
+    assert f"# scaffolded by uipilot v{INSTALLED}" in config
+    # ... and still loads + validates cleanly with the stamp comment in place
+    assert validate(load_pack(tmp_path / ".uipilot")).ok
+
+
+def test_update_refreshes_detected_agent_files_only(tmp_path):
+    scaffold.init_project(tmp_path, agents=["claude", "agents"])
+    # simulate files scaffolded by an older uipilot
+    skill_path = tmp_path / ".claude/skills/uipilot/SKILL.md"
+    skill_path.write_text(skill_path.read_text().replace(f"uipilot:v{INSTALLED}", "uipilot:v0.1.0"))
+    (tmp_path / ".uipilot/data/flows.yaml").write_text("flows: {}\n")  # user's pack work
+
+    result = scaffold.update_project(tmp_path)
+    assert result["version"] == INSTALLED
+    assert {r["file"]: (r["from"], r["to"]) for r in result["refreshed"]} == {
+        ".claude/skills/uipilot/SKILL.md": ("0.1.0", INSTALLED),
+        "AGENTS.md": (INSTALLED, INSTALLED),
+    }
+    assert scaffold.stamped_version(skill_path.read_text()) == INSTALLED
+    # pack files are never touched by update
+    assert (tmp_path / ".uipilot/data/flows.yaml").read_text() == "flows: {}\n"
+    assert result["pack_scaffolded"] == INSTALLED
+
+
+def test_update_finds_nothing_in_a_fresh_dir(tmp_path):
+    result = scaffold.update_project(tmp_path)
+    assert result["refreshed"] == []
+    assert result["pack_scaffolded"] is None
+    assert not (tmp_path / ".claude").exists()
+
+
+def test_update_ignores_foreign_agents_md_but_can_add_targets(tmp_path):
+    # a project's own AGENTS.md (no uipilot markers) is not uipilot's to rewrite
+    (tmp_path / "AGENTS.md").write_text("# House rules\n")
+    scaffold.init_project(tmp_path, agents=["claude"])
+    result = scaffold.update_project(tmp_path)
+    assert [r["file"] for r in result["refreshed"]] == [".claude/skills/uipilot/SKILL.md"]
+    assert (tmp_path / "AGENTS.md").read_text() == "# House rules\n"
+
+    # --agent opts the file in: the block is appended, house rules preserved
+    result = scaffold.update_project(tmp_path, agents=["agents", "bogus"])
+    assert [r["file"] for r in result["refreshed"]] == [
+        ".claude/skills/uipilot/SKILL.md",
+        "AGENTS.md",
+    ]
+    text = (tmp_path / "AGENTS.md").read_text()
+    assert "# House rules" in text and scaffold._MARK_START in text

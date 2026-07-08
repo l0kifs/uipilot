@@ -27,6 +27,7 @@ from uipilot.infrastructure.capabilities import CapabilityRegistry
 from uipilot.infrastructure.markdown_importer import import_md, write_seed
 from uipilot.infrastructure.pack_loader import load_pack
 from uipilot.infrastructure.scaffold import init_project as _init_project
+from uipilot.infrastructure.scaffold import update_project as _update_project
 
 
 @dataclass
@@ -238,6 +239,11 @@ def list_capabilities(pctx: PackContext, check: bool = False) -> list[dict]:
 def init_project(dest: str | Path, agents: list[str], force: bool = False) -> dict:
     """Scaffold a pack skeleton + agent instruction files under ``dest``."""
     return _init_project(dest, agents=agents, force=force)
+
+
+def update_project(dest: str | Path, agents: Optional[list[str]] = None) -> dict:
+    """Refresh agent instruction files under ``dest`` to the installed version."""
+    return _update_project(dest, agents=agents)
 
 
 def import_markdown(md_file: str | Path, out_dir: str | Path) -> dict:

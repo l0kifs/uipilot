@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-08
+
+### Added
+
+- **`uipilot update`** — refresh the scaffolded agent instruction files
+  (`.claude/skills/uipilot/SKILL.md`, the `AGENTS.md` block) to the installed
+  uipilot version after a tool upgrade. Targets are auto-detected from what
+  `init` previously wrote (`--agent` adds a missing one); pack files under
+  `.uipilot/` are never touched. If the pack was scaffolded by an older
+  version, `update` points you at `uipilot validate`.
+- **Version stamps on scaffolded files.** The skill and the `AGENTS.md` block
+  now carry a `<!-- uipilot:vX.Y.Z … -->` stamp marking them as generated
+  (do not edit by hand — `init`/`update` overwrite them), and
+  `flowmap.config.yaml` records the scaffolding version in a comment so schema
+  drift is visible. `uipilot update` reports each file's stamped → installed
+  version.
+
+### Fixed
+
+- The scaffolded `flowmap.config.yaml` no longer references the removed
+  `PACK_AUTHORING` doc — the shipped skill is the single reference.
+
 ## [0.4.0] - 2026-07-08
 
 ### Added
@@ -106,7 +128,8 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/l0kifs/uipilot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/l0kifs/uipilot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/l0kifs/uipilot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/l0kifs/uipilot/compare/v0.1.0...v0.2.0

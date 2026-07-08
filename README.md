@@ -38,6 +38,21 @@ explores the app, fills the pack, and drives it for you. Re-running `init`
 refreshes the skill but never clobbers a pack you've started (use `--force` to
 overwrite).
 
+### Upgrading
+
+After upgrading the CLI, refresh the scaffolded agent instructions in each
+project — packs are never touched:
+
+```bash
+uv tool upgrade uipilot
+cd your-project
+uipilot update                   # refreshes SKILL.md / AGENTS.md block in place
+```
+
+Scaffolded files carry a version stamp, so `update` reports exactly what moved
+(e.g. `SKILL.md (v0.4.0 → v0.5.0)`) and reminds you to re-run `validate` if the
+pack was scaffolded by an older version.
+
 Because `init` scaffolds a `.uipilot/` pack in the cwd, every later `uipilot …`
 call finds it with **no `--pack` flag** (resolution order: `$UIPILOT_PACK` → a
 `.uipilot/` pack in the cwd → the bundled `examples/demo` pack).
@@ -136,6 +151,7 @@ glance.
 | `emit --format pw-pom\|pw-test` | Generate Python POM classes / a pw-test spec |
 | `capabilities [--check]` | List (and import-check) the pack's auth adapters |
 | `init [dir] [--agent claude\|agents] [--force]` | Scaffold a pack + Claude skill (add `--agent agents` for AGENTS.md) |
+| `update [dir] [--agent claude\|agents]` | Refresh scaffolded agent instructions to the installed version (pack untouched) |
 | `import-md <file> --out <dir>` | One-time: seed a pack from a retired Markdown map |
 
 ### `script`
