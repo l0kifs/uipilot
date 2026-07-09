@@ -195,3 +195,76 @@ def test_wait_for_element_derives_text(pack, ctx):
     s = compile_flow(pack, ctx, "create_project_with_credential")
     waits = [st for st in s.steps if st.op == "wait_for" and st.mcp]
     assert any(w.mcp["args"].get("text") for w in waits)
+
+
+# --- auth precondition skip_if (from the entry flow's guard) ----------------
+
+
+def test_auth_skip_if_from_guard(pack, ctx):
+    # console_sign_in guards on {expect: {text: "Current session"}}; that marker
+    # must ride into the prepended auth precondition so the agent can skip-check.
+    s = compile_path(pack, ctx, "act_cs_open_projects", "act_cs_create_project")
+    auth = next(p for p in s.preconditions if p["kind"] == "auth")
+    assert auth["skip_if"] == {"text": "Current session"}
+
+
+def test_auth_no_skip_if_when_entry_flow_unguarded(pack, ctx):
+    # portal_sign_in has no guard → no skip_if key (agent must actually sign in).
+    s = compile_path(pack, ctx, "act_pt_open_wallet_detail", "act_pt_submit_withdrawal")
+    auth = next(p for p in s.preconditions if p["kind"] == "auth")
+    assert "skip_if" not in auth
+
+
+# --- executor tool-prefix (playwright-mcp output only) ----------------------
+
+
+def test_executor_prefix_only_in_mcp_output(pack, ctx):
+    s = compile_flow(pack, ctx, "create_project_with_credential")
+    assert s.as_dict(with_mcp=True)["executor"]["tool_prefix"] == "mcp__playwright__"
+    assert "executor" not in s.as_dict(with_mcp=False)
+
+
+# --- params_satisfiable (env-backed secret defaults) ------------------------
+
+
+def _pack_with_env_secret(tmp_path):
+    """Demo pack + an env-backed secret token and a required secret param whose
+    default draws from it (models a sign-in password wired to `.uipilot/.env`)."""
+    shutil.copytree(DEMO, tmp_path, dirs_exist_ok=True)
+    cfg = tmp_path / "flowmap.config.yaml"
+    cdoc = yaml.safe_load(cfg.read_text())
+    cdoc.setdefault("tokens", {})["portal_secret"] = {"from": "env", "name": "PORTAL_SECRET"}
+    cfg.write_text(yaml.safe_dump(cdoc))
+
+    ap = tmp_path / "data" / "console.app.yaml"
+    adoc = yaml.safe_load(ap.read_text())
+    adoc["actions"]["act_cs_sign_in_submit"]["params"].append(
+        {"key": "api_secret", "type": "secret", "required": True, "default": "{{portal_secret}}"}
+    )
+    ap.write_text(yaml.safe_dump(adoc))
+    return load_pack(tmp_path)
+
+
+def test_params_satisfiable_when_env_present(tmp_path):
+    pack = _pack_with_env_secret(tmp_path)
+    ctx = RuntimeContext(pack.config, env={"PORTAL_SECRET": "s3cr3t"})
+    s = compile_flow(pack, ctx, "create_project_with_credential")
+    # Still required (never materialised from a default), but flagged env-satisfiable.
+    assert "api_secret" in s.params_required
+    assert s.params_satisfiable["api_secret"] == {"source": "env:PORTAL_SECRET", "present": True}
+    # The value is never echoed.
+    assert s.params["api_secret"] == "{{api_secret}}"
+
+
+def test_params_satisfiable_marks_env_absent(tmp_path):
+    pack = _pack_with_env_secret(tmp_path)
+    ctx = RuntimeContext(pack.config, env={})
+    s = compile_flow(pack, ctx, "create_project_with_credential")
+    assert s.params_satisfiable["api_secret"] == {"source": "env:PORTAL_SECRET", "present": False}
+
+
+def test_plain_secret_without_env_default_not_satisfiable(pack, ctx):
+    # The demo password secret has no default → not env-satisfiable, only required.
+    s = compile_flow(pack, ctx, "create_project_with_credential")
+    assert "password" in s.params_required
+    assert "password" not in s.params_satisfiable

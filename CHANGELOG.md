@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-09
+
+### Added
+
+- **`uipilot plan --flow NAME`** — a one-shot flow brief that returns the app
+  (id + base URL + auth entry flow), the flow `guard`, the full param manifest,
+  **and** the compiled `script` in a single JSON. Collapses the
+  `apps` → `flow` → `flow --params` → `script` discovery round-trips an agent
+  otherwise makes before it can drive a flow. Accepts the same
+  `--set`/`--params`/`--skip-auth`/`--batch`/`--refuse-destructive` as `script`.
+- **`params_satisfiable` in compiled scripts.** When a required param (typically
+  a `secret`) has a default that draws from env-backed pack token(s), the script
+  now reports `{param: {source: "env:VAR", present: bool}}` — so an agent supplies
+  the value with `--set k=$VAR` instead of spelunking the pack to discover a
+  secret is already on disk. The value itself is never included.
+- **`skip_if` on the auth precondition.** The auth entry flow's `guard` now rides
+  into the compiled `auth` precondition as a machine-checkable `skip_if` marker
+  (e.g. `{"text": "Service Wallets"}`). The agent's first snapshot doubles as the
+  "am I already signed in?" check — no separate `flow NAME` lookup, no
+  hand-reasoning about the guard.
+- **`executor.tool_prefix` in playwright-mcp output.** The compiled script now
+  states how its **bare** `mcp.tool` names map onto a namespaced MCP registry
+  (`mcp__playwright__` by convention), so an agent prepends the prefix instead of
+  failing a first tool lookup. Emitted only in the `playwright-mcp` format; the
+  plain `json` format stays clean.
+
 ## [0.6.0] - 2026-07-08
 
 ### Added
@@ -144,7 +170,8 @@ Initial release.
   **teardown** support.
 - **Agent guide** documentation and static-analysis tooling (ruff, ty, vulture).
 
-[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/l0kifs/uipilot/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/l0kifs/uipilot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/l0kifs/uipilot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/l0kifs/uipilot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/l0kifs/uipilot/compare/v0.3.0...v0.4.0

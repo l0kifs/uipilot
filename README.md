@@ -75,6 +75,9 @@ Built with the `uv_build` backend; dependencies are locked in `uv.lock`.
 uipilot --pack examples/demo --format table apps
 uipilot --pack examples/demo flows
 
+# one-shot flow brief: app + guard + param manifest + compiled script in one call
+uipilot --pack examples/demo plan --flow create_project_with_credential
+
 # compile a flow into an executable Playwright-MCP script
 uipilot --pack examples/demo script --flow create_project_with_credential
 
@@ -154,6 +157,7 @@ glance.
 | `uses <id>` | Reverse index — change blast radius before you edit |
 | `flows` / `flow <name> [--params]` | List / show named flows (`--params`: aggregated param manifest only) |
 | `path --from <a> --to <b>` | BFS a route through the flow graph |
+| `plan --flow <name> …` | **One-shot flow brief**: app + guard + param manifest + compiled script in one JSON (see below) |
 | `script …` | **Emit an executable Playwright-MCP script** (see below) |
 | `validate` | Lint the model statically (CI gate) |
 | `verify …` | Emit a read-only probe to detect live UI drift |
@@ -162,6 +166,20 @@ glance.
 | `init [dir] [--agent claude\|agents] [--force]` | Scaffold a pack + Claude skill (add `--agent agents` for AGENTS.md) |
 | `update [dir] [--agent claude\|agents]` | Refresh scaffolded agent instructions to the installed version (pack untouched) |
 | `import-md <file> --out <dir>` | One-time: seed a pack from a retired Markdown map |
+
+### `plan`
+
+```
+uipilot plan --flow <name>
+             [--params file.json] [--set key=value ...]
+             [--skip-auth] [--batch] [--refuse-destructive]
+```
+
+Returns the app (id + base URL + auth entry flow), the flow's `guard`, the full
+param manifest, **and** the compiled script in a single JSON — collapsing the
+`apps` → `flow` → `flow --params` → `script` discovery round-trips an agent
+otherwise makes before it can drive a flow. Takes the same compile options as
+`script`.
 
 ### `script`
 
@@ -179,7 +197,19 @@ uipilot script (--flow <name> | --from <a> --to <b> | --actions a,b,c)
   pack tokens (`{{prefix}}`, `{{seq}}`). Unresolved **required** params are
   emitted as `{{placeholder}}` and listed under `params_required`.
 * **Secrets** (`type: secret`) never appear in the header echo — only in the one
-  step that consumes them.
+  step that consumes them. When a required param's default draws from env-backed
+  pack token(s), **`params_satisfiable`** reports
+  `{param: {source: "env:VAR", present: bool}}` so the agent supplies the value
+  with `--set k=$VAR` instead of asking a human; the value itself is never
+  included.
+* **Auth skip check:** the auth entry flow's `guard` rides into the compiled
+  `auth` precondition as a machine-checkable **`skip_if`** marker (e.g.
+  `{"text": "Service Wallets"}`), so the agent's first snapshot doubles as the
+  "am I already signed in?" check.
+* **`executor.tool_prefix`** (playwright-mcp output only) states how the bare
+  `mcp.tool` names map onto a namespaced MCP registry (`mcp__playwright__` by
+  convention), so the agent prepends the prefix instead of failing a first tool
+  lookup.
 * **`--refuse-destructive`** refuses to emit if any action on the path carries a
   `risk` in the pack's `risk.gated` set. The header always surfaces `risk_max`.
 * **`--batch`** collapses consecutive form fills into one `browser_fill_form`.

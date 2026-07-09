@@ -34,6 +34,25 @@ def test_cli_script_flow():
     assert '"tool": "browser_navigate"' in result.stdout
 
 
+def test_cli_plan_flow_is_one_shot():
+    result = runner.invoke(app, [*PACK, "plan", "--flow", "create_project_with_credential"])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    # app + guard + manifest + compiled script, all in one call.
+    assert data["flow"] == "create_project_with_credential"
+    assert data["app"]["id"] == "console"
+    assert data["app"]["base_url"]
+    assert "guard" in data
+    assert isinstance(data["params_manifest"], list)
+    assert data["script"]["executor"]["tool_prefix"] == "mcp__playwright__"
+    assert data["script"]["steps"]
+
+
+def test_cli_plan_unknown_flow_exit_2():
+    result = runner.invoke(app, [*PACK, "plan", "--flow", "does_not_exist"])
+    assert result.exit_code == 2
+
+
 def test_cli_path_not_found_reports_reason():
     result = runner.invoke(
         app, [*PACK, "path", "--from", "act_cs_view_dashboard", "--to", "act_pt_submit_withdrawal"]

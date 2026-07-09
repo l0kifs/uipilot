@@ -8,7 +8,7 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 
 | # | Use case | Actor | Command | Value |
 |---|---|---|---|---|
-| 1 | Run/automate a UI flow (sign-in, create X, submit Y) | A | `script --flow N` | Selectors pre-resolved → lookup, not live reasoning |
+| 1 | Run/automate a UI flow (sign-in, create X, submit Y) | A | `plan --flow N` / `script --flow N` | Selectors pre-resolved → lookup, not live reasoning |
 | 2 | Click-path between two screens | A | `path --from A --to B` | BFS a route through the action graph |
 | 3 | Drift-check: map still matches live app? | A | `verify --flow N` | Read-only probe; catch stale selectors before running |
 | 4 | Static consistency lint (CI gate) | D | `validate` | Dangling refs, broken edges, unreachable, unbound calls |
@@ -16,6 +16,7 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 | 6 | Generate test artifacts | D | `emit --format pw-test\|pw-pom` | `@playwright/test` spec / Python POM classes |
 | 7 | Explore the app graph | A/D | `apps` `actions` `elements` `flows` `show` | Discover ids, selectors, routes, params |
 | 8 | Know required inputs up front | A | `flow N --params` | Aggregated param manifest, one lookup |
+| 8b | One-shot flow brief | A | `plan --flow N` | App + guard + param manifest + compiled script in one call |
 | 9 | Human preview before a risky run | H | `script --flow N --format human` | Plain-English steps + risk + teardown |
 | 10 | API provisioning + backend cross-check | A | api actions in flow | Fast setup + assert UI-created record via REST |
 | 11 | Bootstrap in a project | D | `init` | Scaffold pack skeleton + Claude skill (`--agent agents` for AGENTS.md) |
@@ -24,16 +25,25 @@ Actors: **A** = AI agent (runtime) · **D** = pack author/dev · **H** = human v
 | 14 | Auth/secret adapters (MFA, session) | A | `capabilities` | Mint secrets, reuse `storageState` |
 
 ## Core runtime loop (UC 1)
+
+**Fast path:** `plan --flow N --set k=v` returns app + guard + param manifest +
+compiled script in one JSON (collapses steps 1–4), then execute (step 5).
+
 1. `apps` → pick app · `flows` → pick flow (check `guard`).
 2. `flow N --params` → gather inputs (`required`, `secret`, `satisfied_by`).
 3. *(opt)* `verify --flow N` → stop if drift.
 4. `script --flow N --set k=v` → compile.
 5. Execute JSON with Playwright MCP: `preconditions` → `steps` → `crosschecks` → `teardown`.
+   The auth precondition's `skip_if` marker (from the entry flow's guard) lets the
+   first snapshot double as the "already signed in?" check; `executor.tool_prefix`
+   maps bare `mcp.tool` names onto the namespaced MCP registry.
 6. Emit a `run_report` for H.
 
 ## Safety model
 - **Emit-only**: safe to point at money-moving flows.
-- **Secrets** never echoed; `param_capabilities` says which the agent mints vs. asks H.
+- **Secrets** never echoed; `param_capabilities` says which the agent mints,
+  `params_satisfiable` which are already env-backed (`--set k=$VAR`, value never
+  exposed) — only the rest are asked of H.
 - **Risk taxonomy** is pack data; `risk_max`/`crosses_app` shown up front.
 - **Gated risk** (destructive/money-moving): `--refuse-destructive` blocks emit;
   `verify --drive` walks without side effects.

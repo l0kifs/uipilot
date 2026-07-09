@@ -208,6 +208,40 @@ def compile_script(
     raise ValueError("compile needs a flow, a path (src/dst), or actions")
 
 
+def plan_flow(pctx: PackContext, name: str, **compile_kw) -> dict:
+    """One-shot flow brief: app + guard + param manifest + compiled script.
+
+    Collapses the ``apps`` → ``flow`` → ``flow --params`` → ``script`` discovery
+    round-trips an agent otherwise makes before it can drive a flow. Everything
+    it needs to run "sign in (if needed) then do X" comes back in a single call:
+    which app and base URL, whether a guard lets it skip auth, which params are
+    required / secret / env-satisfiable, and the executable steps.
+    """
+    pack = pctx.pack
+    flow = pack.flow(name)
+    if flow is None:
+        raise KeyError(f"no flow named '{name}'")
+    app = pack.app(flow.app) if flow.app else None
+    compiled = compile_script(pctx, flow=name, **compile_kw)
+    app_info = None
+    if app is not None:
+        app_info = {
+            "id": app.id,
+            "base_url": pctx.runtime.base_url(app),
+            "auth_entry_flow": app.auth.entry_flow if app.auth else None,
+            "storage_state_key": app.auth.storage_state_key if app.auth else None,
+        }
+    elif flow.app:
+        app_info = {"id": flow.app}
+    return {
+        "flow": name,
+        "app": app_info,
+        "guard": flow.guard,
+        "params_manifest": flow_param_manifest(pctx, name),
+        "script": compiled.as_dict(with_mcp=True),
+    }
+
+
 def validate_pack(pctx: PackContext, app: Optional[str] = None) -> ValidationReport:
     return validation.validate(pctx.pack, app=app)
 

@@ -500,6 +500,43 @@ def script(
         print(renderers.to_playwright_mcp(compiled))
 
 
+# ---------------------------------------------------------------------------
+# plan
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def plan(
+    ctx: typer.Context,
+    flow_name: str = typer.Option(..., "--flow"),
+    params_file: Optional[str] = typer.Option(None, "--params"),
+    set_: list[str] = typer.Option(None, "--set", help="key=value (repeatable)"),
+    skip_auth: bool = typer.Option(False, "--skip-auth"),
+    batch: bool = typer.Option(False, "--batch"),
+    refuse_destructive: bool = typer.Option(False, "--refuse-destructive"),
+) -> None:
+    """One-shot brief for a flow: app + guard + param manifest + compiled script.
+
+    Collapses the apps → flow → flow --params → script round-trips into one call,
+    so an agent has everything it needs to drive the flow from a single lookup.
+    """
+    pctx = _load(ctx)
+    overrides = _collect_overrides(params_file, set_)
+    try:
+        payload = service.plan_flow(
+            pctx,
+            flow_name,
+            overrides=overrides,
+            skip_auth=skip_auth,
+            batch=batch,
+            refuse_destructive=refuse_destructive,
+        )
+    except (KeyError, UipilotError) as exc:
+        err_console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from None
+    _emit(ctx, payload)
+
+
 def _collect_overrides(params_file: Optional[str], set_: Optional[list]) -> dict:
     overrides: dict = {}
     if params_file:

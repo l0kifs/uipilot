@@ -24,7 +24,14 @@ from typing import Optional
 from uipilot.domain.flows import Invocation, expand_invocations
 from uipilot.domain.graph import find_path
 from uipilot.domain.model import INTERACTING_OPS, Action, Pack
-from uipilot.domain.templating import RuntimeContext, resolve_template
+from uipilot.domain.templating import RuntimeContext, iter_template_refs, resolve_template
+
+# The Playwright MCP server is conventionally registered under the name
+# ``playwright``, so its tools are exposed as ``mcp__playwright__<tool>``. Each
+# step's ``mcp.tool`` is emitted *bare* (``browser_navigate`); an agent whose
+# tool registry namespaces MCP tools must prepend this prefix. Surfaced in the
+# ``playwright-mcp`` output so the agent doesn't guess (and fail a first lookup).
+PLAYWRIGHT_MCP_TOOL_PREFIX = "mcp__playwright__"
 
 # ---------------------------------------------------------------------------
 # Output shapes
@@ -85,6 +92,11 @@ class CompiledScript:
     # {param_key: capability_key} for required params a capability can mint —
     # the agent resolves these itself instead of prompting a human.
     param_capabilities: dict = field(default_factory=dict)
+    # {param_key: {source: "env:VAR", present: bool}} for required params whose
+    # default draws from env-backed token(s). Lets the agent supply the value
+    # from the environment (``--set k=$VAR``) instead of spelunking the pack to
+    # discover a secret is already on disk. Never carries the value itself.
+    params_satisfiable: dict = field(default_factory=dict)
 
     def as_dict(self, *, with_mcp: bool = True) -> dict:
         out: dict = {
@@ -100,12 +112,25 @@ class CompiledScript:
         out["params_required"] = self.params_required
         if self.param_capabilities:
             out["param_capabilities"] = self.param_capabilities
+        if self.params_satisfiable:
+            out["params_satisfiable"] = self.params_satisfiable
         out["preconditions"] = self.preconditions
         out["steps"] = [s.as_dict(with_mcp=with_mcp) for s in self.steps]
         if self.crosschecks:
             out["crosschecks"] = self.crosschecks
         if self.teardown:
             out["teardown"] = self.teardown
+        if with_mcp:
+            # The agent drives from this shape; tell it how bare mcp.tool names
+            # map onto its namespaced MCP registry (avoids a failed first lookup).
+            out["executor"] = {
+                "kind": "playwright-mcp",
+                "tool_prefix": PLAYWRIGHT_MCP_TOOL_PREFIX,
+                "note": (
+                    "each step's mcp.tool is a bare name; the registered tool is "
+                    "tool_prefix + name (server name may differ if re-registered)"
+                ),
+            }
         return out
 
 
@@ -133,14 +158,37 @@ class _Compiler:
         self.params_echo: dict[str, str] = {}
         self.params_required: list[str] = []
         self.param_capabilities: dict[str, str] = {}
+        self.params_satisfiable: dict[str, dict] = {}
         self._produced_captures: set[str] = set()
 
     def _note_required(self, param) -> None:
-        """Record a missing required param and any capability that can mint it."""
+        """Record a missing required param, any capability that can mint it, and
+        any env-backed token its default draws from (so the agent can supply the
+        value from the environment rather than hunt for it)."""
         if param.key not in self.params_required:
             self.params_required.append(param.key)
         if param.satisfied_by:
             self.param_capabilities[param.key] = param.satisfied_by
+        env_src = self._env_source_for(param)
+        if env_src and param.key not in self.params_satisfiable:
+            self.params_satisfiable[param.key] = env_src
+
+    def _env_source_for(self, param) -> Optional[dict]:
+        """If ``param``'s default references env-backed pack token(s), report the
+        source env var(s) and whether they currently resolve — without ever
+        exposing the value. Returns ``None`` when no env token is involved."""
+        if not param.default:
+            return None
+        names: list[str] = []
+        for ref in iter_template_refs(param.default):
+            tok = self.ctx.config.tokens.get(ref)
+            if tok and tok.from_ == "env" and tok.name:
+                names.append(tok.name)
+        if not names:
+            return None
+        present = all(bool(self.ctx.env.get(name)) for name in names)
+        source = ", ".join(f"env:{name}" for name in names)
+        return {"source": source, "present": present}
 
     # -- param resolution ---------------------------------------------------
 
@@ -333,6 +381,7 @@ class _Compiler:
             refused=refused,
             teardown=teardown,
             param_capabilities=dict(self.param_capabilities),
+            params_satisfiable=dict(self.params_satisfiable),
         )
 
     def _teardown_entries(self, teardown_invs, flow_defaults) -> list[dict]:
@@ -388,11 +437,18 @@ class _Compiler:
             "flow": entry_flow,
             "storage_state_key": key,
             "hint": (
-                f"reuse Playwright storageState '{key}' if present and fresh; "
-                "else run the sign-in subflow and re-save state"
+                "snapshot the app first; if skip_if matches you are already "
+                f"signed in — skip auth. Else reuse Playwright storageState '{key}' "
+                f"if present and fresh, or run sign-in flow '{entry_flow}' and re-save state"
             ),
             "run_by": "agent",
         }
+        # Surface the entry flow's guard as a machine-checkable skip marker, so the
+        # agent's first snapshot doubles as "am I already signed in?" — no separate
+        # `flow NAME` lookup and no hand-reasoning about the guard.
+        skip_if = _guard_marker(entry.guard) if entry else None
+        if skip_if:
+            pre["skip_if"] = skip_if
         return [pre], [primary_app]
 
     def _emit_ui_steps(self, ui_invs, flow_defaults) -> list[CompiledStep]:
@@ -555,6 +611,20 @@ class _Compiler:
 # ---------------------------------------------------------------------------
 # Public entry points
 # ---------------------------------------------------------------------------
+
+
+def _guard_marker(guard: Optional[dict]) -> Optional[dict]:
+    """Extract the observable marker from a flow guard (``{expect|wait_for: {...}}``).
+
+    Returns the inner ``{text: …}`` / ``{textGone: …}`` payload an agent can pass
+    straight to ``browser_wait_for`` / assert against a snapshot, or ``None``.
+    """
+    if not guard:
+        return None
+    marker = guard.get("expect") or guard.get("wait_for")
+    if isinstance(marker, dict) and marker:
+        return marker
+    return None
 
 
 def compile_flow(pack: Pack, ctx: RuntimeContext, flow_id: str, **kw) -> CompiledScript:

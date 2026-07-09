@@ -1,6 +1,6 @@
 [project]
 name = "uipilot"
-version = "0.6.0"
+version = "0.7.0"
 description = "App-agnostic engine that models a web UI as a graph and compiles flows into Playwright-MCP-executable scripts for agents."
 readme = "README.md"
 requires-python = ">=3.12"

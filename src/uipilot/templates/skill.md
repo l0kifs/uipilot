@@ -2,13 +2,19 @@
 name: uipilot
 description: >-
   Compile web-UI flows into Playwright-MCP-executable scripts from a structured
-  pack, and drive them with the Playwright MCP tools. Use when asked to
-  automate/run/test a web-UI flow (sign-in, create X, submit Y), check whether a
-  UI map still matches the live app (drift), find a click-path between screens,
-  generate @playwright/test specs or Page Objects, or explore an app's
-  action/element graph. Triggers: "run/automate/test the … flow", "click through
-  to …", "does the map still match", "generate a Playwright test/POM", "what
-  breaks if I change this selector".
+  pack (a `.uipilot/` directory), and drive them with the Playwright MCP tools.
+  Use for anything touching a uipilot pack — both running flows AND setting one
+  up. Running: automate/run/test a web-UI flow (sign-in, create X, submit Y),
+  check whether a UI map still matches the live app (drift), find a click-path
+  between screens, generate @playwright/test specs or Page Objects, or explore
+  an app's action/element graph. Authoring/setup: create or edit the pack's
+  `.uipilot/.env`, add credentials/base-URLs for a stand/tenant, wire login
+  secrets to a sign-in flow, scaffold a new pack, or map a new app/flow/element.
+  Triggers: "run/automate/test the … flow", "click through to …", "does the map
+  still match", "generate a Playwright test/POM", "what breaks if I change this
+  selector", "add credentials / create the .env for the pack", "set up the
+  .uipilot pack", "configure the stand/tenant", "map a new flow/element",
+  anything mentioning ".uipilot".
 ---
 
 # uipilot — agent guide
@@ -40,6 +46,7 @@ uipilot [--pack DIR] [--format json|table|md] <command> [opts]
 | `show action ID` / `show element ID` | full detail (selectors inline, step recipe) |
 | `uses REF` | reverse index — what breaks if you edit an element/action/flow |
 | `path --from A --to B [--max-depth 25]` | shortest click-path between UI actions |
+| **`plan --flow NAME`** | **one-shot brief: app + guard + param manifest + compiled script in one call** (collapses apps→flow→--params→script) |
 | **`script`** | **emit the executable script** (see below) |
 | `validate [--app]` | static lint the map (CI health); exit 1 on errors |
 | `verify [--flow\|--app\|--action] [--drive] [--allow-gated]` | read-only drift probe vs live app |
@@ -72,12 +79,19 @@ uipilot [--pack DIR] [--format json|table|md] <command> [opts]
     before you start — you can't toggle it mid-session.
   - **Background** → a **headless** MCP server. Use only when the user asks for it.
 
+**Fast path — one call covers discovery.** `uipilot plan --flow NAME` returns the
+app (id + base URL + auth entry flow), the flow `guard`, the full param manifest,
+**and** the compiled `script` in a single JSON — collapsing steps 1–5 below. Reach
+for `plan` first; drop to the individual commands only when you need to explore
+(`flows`/`actions`/`path`) or drift-check (`verify`). `plan` takes the same
+`--set`/`--params`/`--skip-auth`/`--batch`/`--refuse-destructive` as `script`.
+
 1. **Pick the app**: `uipilot apps`. **If it returns >1 app**, don't guess "the app" — match the user's wording to an app `id`/`base_url`, else ask which. Login/auth flows are each app's `auth_entry_flow`.
-2. **Find the flow**: `uipilot flows` → pick an id. `uipilot flow NAME` inspects path/params **and any `guard`** — a cheap `expect`/`wait_for` meaning "already done, skip if it passes" (e.g. auth flows guard on a signed-in marker). Guards appear here, **not** in `script` output, so for sign-in: check the guard / reuse an existing session before running the flow.
+2. **Find the flow**: `uipilot flows` → pick an id. `uipilot flow NAME` inspects path/params **and any `guard`** — a cheap `expect`/`wait_for` meaning "already done, skip if it passes" (e.g. auth flows guard on a signed-in marker). The guard also rides into `plan`/`script` output as the auth precondition's `skip_if` (see the contract), so for sign-in you snapshot once and skip if it matches — no separate lookup.
 3. **(Optional) drift-check first**: `uipilot verify --flow NAME` → read-only probe; if an element/route fails to resolve, the map is stale — stop and report.
-4. **Know the params up front**: `uipilot flow NAME --params` returns the full manifest (flow-level **and** every action's params, deduped) — `required`, `secret`, `enum`, `satisfied_by` — in one cheap lookup, so you gather values once instead of compile→read→recompile.
-5. **Compile**: `uipilot script --flow NAME --format playwright-mcp` (default). Add `--format human` for a plain-English preview to show a human before running a risky flow.
-6. **Supply params**: `--set key=value` (repeatable) or `--params file.json`. Everything in `params_required` MUST be provided (secrets are required there and never echoed).
+4. **Know the params up front**: `plan` includes the manifest; or `uipilot flow NAME --params` returns it alone (flow-level **and** every action's params, deduped) — `required`, `secret`, `enum`, `satisfied_by` — so you gather values once instead of compile→read→recompile.
+5. **Compile**: `uipilot plan --flow NAME` (or `script --flow NAME`) — `--format playwright-mcp` is the `script` default. Add `script --format human` for a plain-English preview to show a human before running a risky flow.
+6. **Supply params**: `--set key=value` (repeatable) or `--params file.json`. Everything in `params_required` MUST be provided (secrets are required there and never echoed) — but first check `params_satisfiable`: a param listed there is already available from the environment (e.g. `{"password": {"source": "env:TENANT_PASSWORD", "present": true}}`), so supply it with `--set password=$TENANT_PASSWORD` instead of hunting for the value or asking the human.
 7. **Execute the JSON** (contract below) with Playwright MCP tools, then **report** (see below).
 
 ```
@@ -90,13 +104,19 @@ uipilot script --flow create_project_with_credential \
 ```
 flow, app, requires_auth[], risk_max, crosses_app,
 params{echo}, params_required[], param_capabilities{param: capability},
-preconditions[], steps[], crosschecks[], teardown[], refused?
+params_satisfiable{param: {source, present}}, preconditions[], steps[],
+crosschecks[], teardown[], refused?, executor{tool_prefix}
 ```
+
+`executor.tool_prefix` (playwright-mcp output only) is how each step's **bare**
+`mcp.tool` maps onto your namespaced MCP registry: the tool you actually call is
+`tool_prefix + name`, e.g. `browser_navigate` → `mcp__playwright__browser_navigate`.
+Prepend it rather than calling the bare name (which won't resolve).
 
 Run in order:
 
 1. **`preconditions`** first (each has `run_by: "agent"`):
-   - `kind: auth` → reuse Playwright `storageState` for `storage_state_key` if present/fresh; else run the sign-in `flow` and re-save state.
+   - `kind: auth` → **first take a `browser_snapshot`; if this precondition's `skip_if` marker (e.g. `{"text": "Service Wallets"}`) is already present, you are signed in — skip auth entirely.** Otherwise reuse Playwright `storageState` for `storage_state_key` if present/fresh, else run the sign-in `flow` and re-save state.
    - `kind: api_action` → invoke `call` (`module:function`, a test factory/client) with `args`; keep its `captures`. These are setup, done via API not UI.
 2. **`steps`** in order. Each carries `mcp: {tool, args}` — call that exact tool.
    - An `op: snapshot` step → call `browser_snapshot`; it returns element `ref`s.
@@ -131,7 +151,7 @@ Keep secret values out of the report (echo their param key, never the value).
 
 ## Safety
 
-- **Secrets** (`type: secret`, e.g. password/MFA) are never printed; they appear only in the consuming step and only when you passed them. Missing ones are listed in `params_required`. The `script` output's **`param_capabilities`** map (e.g. `{"mfa_code": "totp"}`) names, per param, a capability that can mint it — resolve those yourself via the adapter (`uipilot capabilities` lists them) instead of asking the human. Only genuinely un-mintable secrets (a human's password) should be requested.
+- **Secrets** (`type: secret`, e.g. password/MFA) are never printed; they appear only in the consuming step and only when you passed them. Missing ones are listed in `params_required`. Before asking a human, check two maps: **`params_satisfiable`** (e.g. `{"password": {"source": "env:TENANT_PASSWORD", "present": true}}`) — the value is already in the environment, so pass `--set password=$TENANT_PASSWORD`; and **`param_capabilities`** (e.g. `{"mfa_code": "totp"}`) — a capability can mint it, so resolve it yourself via the adapter (`uipilot capabilities` lists them). Only a genuinely un-mintable, un-env-backed secret (a human's password not on disk) should be requested.
 - `risk_max` / `crosses_app` tell you the blast radius before running.
 - **Gated risk** (e.g. `destructive`, `money-moving`): to only drift-check without side effects use `verify --flow NAME --drive` (walks the flow but refuses gated steps); add `--allow-gated` only when you truly intend the side effect. Add `--refuse-destructive` to `script` to hard-block emission of gated paths.
 
@@ -326,7 +346,7 @@ table above, write the `steps` recipes and `prev`/`next` edges, then `validate`.
 
 ## When to use which
 
-- "Run/automate/test flow X" → `script --flow X` → execute (core loop).
+- "Run/automate/test flow X" → `plan --flow X` (one-shot app+guard+params+script) → execute (core loop); or `script --flow X` if you already have the app/params.
 - "Click from screen A to B" → `path --from A --to B`, then `script --actions <path>` or `--from/--to`.
 - "Does the map still match the app?" → `verify` (probe) or `verify --drive` (walk).
 - "Is the map internally consistent?" → `validate` (offline; run in CI).
